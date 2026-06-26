@@ -99,7 +99,49 @@
         <div id="meetingSummary" class="meeting-summary">
           <div class="meeting-summary-item">Nプールからの補完をここで確定します。</div>
         </div>
+        <div id="meetingChoices" class="meeting-candidate-grid"></div>
         <button id="meetingConfirm" class="btn-primary" type="button">次のターンへ</button>
+      </section>
+
+      <section id="summerArea" class="phase-area hidden">
+        <div class="phase-head">
+          <h2 id="summerPhaseTitle">講習期</h2>
+          <p id="summerPhaseDescription">-</p>
+          <div class="phase-meta">
+            <span id="summerPrepCounter">-</span>
+            <span id="summerPrepDeckLabel">-</span>
+          </div>
+        </div>
+
+        <div id="summerPrepPanel" class="summer-panel hidden">
+          <div class="summer-panel-head">
+            <h3>準備</h3>
+            <p>山札を選び、トップ3枚から1枚を交換または破棄します。</p>
+          </div>
+          <div id="summerDeckChoices" class="choice-grid"></div>
+          <div id="summerCandidateArea" class="summer-candidate-area"></div>
+          <button id="summerDiscardButton" class="btn-secondary" type="button">交換せず捨てる</button>
+        </div>
+
+        <div id="summerActionPanel" class="summer-panel hidden">
+          <div class="summer-panel-head">
+            <h3>教室行動</h3>
+            <p>4スタッフの個人デッキから1枚ずつ使うか、休憩します。</p>
+          </div>
+          <div id="summerActionGrid" class="summer-action-grid"></div>
+          <button id="summerActionConfirm" class="btn-primary" type="button">教室行動を確定</button>
+        </div>
+
+        <div id="summerMeetingPanel" class="summer-panel hidden">
+          <div class="summer-panel-head">
+            <h3>教室会議</h3>
+            <p>休憩したスタッフは SR が復活し、中期2日目では SSR の復活判定も行います。</p>
+          </div>
+          <div id="summerMeetingSummary" class="meeting-summary"></div>
+          <button id="summerMeetingConfirm" class="btn-primary" type="button">次のターンへ</button>
+        </div>
+
+        <div id="summerDeckGrid" class="summer-deck-grid"></div>
       </section>
 
       <section id="resultArea" class="phase-area hidden">

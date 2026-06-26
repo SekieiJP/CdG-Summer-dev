@@ -2426,6 +2426,198 @@ body {
     gap: 8px;
 }
 
+.summer-panel {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--summer-line);
+    border-radius: 8px;
+    background: var(--summer-bg-soft);
+}
+
+.summer-panel-head h3 {
+    margin: 0 0 4px;
+    font-size: 0.98rem;
+}
+
+.summer-panel-head p {
+    margin: 0;
+    color: var(--summer-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.summer-candidate-area,
+.meeting-candidate-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.summer-candidate-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.summer-card-button,
+.meeting-card-button,
+.summer-deck-card-button,
+.summer-rest-button,
+.summer-target-button {
+    width: 100%;
+    border: 1px solid var(--summer-line);
+    border-radius: 8px;
+    background: var(--summer-panel-soft);
+    color: var(--summer-text);
+    text-align: left;
+    padding: 10px;
+    display: grid;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.summer-card-button.selected,
+.meeting-card-button.selected,
+.summer-deck-card-button.selected,
+.summer-target-button.selected {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.16);
+}
+
+.summer-card-button.disabled,
+.summer-deck-card-button.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.summer-card-top,
+.summer-card-meta,
+.summer-card-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.summer-card-name {
+    font-weight: 700;
+    font-size: 0.88rem;
+    overflow-wrap: anywhere;
+}
+
+.summer-card-desc {
+    color: var(--summer-muted);
+    font-size: 0.74rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.summer-deck-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.summer-deck-column {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--summer-line);
+    background: var(--summer-panel-soft);
+}
+
+.summer-deck-column-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+}
+
+.summer-deck-title {
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+.summer-deck-count {
+    font-size: 0.74rem;
+    color: var(--summer-muted);
+}
+
+.summer-deck-cards {
+    display: grid;
+    gap: 8px;
+}
+
+.summer-deck-card-button {
+    position: relative;
+    min-height: 86px;
+}
+
+.summer-deck-card-button.flipped {
+    background: #111827;
+    color: #94a3b8;
+    border-style: dashed;
+}
+
+.summer-deck-card-button.flipped .summer-card-desc {
+    color: #64748b;
+}
+
+.summer-deck-card-badge {
+    font-size: 0.68rem;
+    color: var(--summer-muted);
+}
+
+.summer-deck-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.summer-rest-button {
+    justify-content: center;
+    text-align: center;
+    min-height: 40px;
+}
+
+.summer-rest-button.active {
+    border-color: var(--color-warning);
+    background: rgba(245, 158, 11, 0.16);
+}
+
+.summer-action-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.summer-action-column {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--summer-line);
+    border-radius: 8px;
+    background: var(--summer-panel-soft);
+}
+
+.summer-action-column-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+}
+
+.summer-action-card-list {
+    display: grid;
+    gap: 8px;
+}
+
+.summer-action-note {
+    color: var(--summer-muted);
+    font-size: 0.76rem;
+}
+
 .meeting-summary,
 .result-summary {
     display: grid;
@@ -2569,8 +2761,15 @@ body {
 
     .choice-grid,
     .hand-grid,
-    .phase-detail-grid {
+    .phase-detail-grid,
+    .summer-deck-grid,
+    .summer-candidate-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .summer-action-grid,
+    .meeting-candidate-grid {
+        grid-template-columns: 1fr;
     }
 
     .result-item {

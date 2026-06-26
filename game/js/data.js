@@ -208,6 +208,7 @@ export function getStaffKeysForCard(card) {
     ['室長', 'leader'],
     ['講師', 'teacher'],
     ['事務', 'office'],
+    ['アルバイト講師', 'alba'],
   ]);
 
   const keys = tokens.map((token) => map.get(token)).filter(Boolean);
@@ -218,4 +219,3 @@ export function formatDelta(delta) {
   const sign = delta > 0 ? '+' : '';
   return `${sign}${delta}`;
 }
-

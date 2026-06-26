@@ -2,11 +2,15 @@ export const STAFFS = [
   { key: 'leader', label: '室長' },
   { key: 'teacher', label: '講師' },
   { key: 'office', label: '事務' },
+  { key: 'alba', label: 'アルバイト講師' },
 ];
 
 export const STAFF_LABEL_TO_KEY = Object.fromEntries(
   STAFFS.map((staff) => [staff.label, staff.key]),
 );
+
+export const NORMAL_STAFF_KEYS = ['leader', 'teacher', 'office'];
+export const SUMMER_STAFF_KEYS = ['leader', 'teacher', 'office', 'alba'];
 
 export const TRAINING_CATEGORIES = ['動員', '教務', '応対', '庶務'];
 
