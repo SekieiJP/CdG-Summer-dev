@@ -1,0 +1,45 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Spring reference assets kept locally during Summer planning.
+# Do not publish these until they are intentionally copied/reworked as Summer assets.
+game/
+solver/
+gas/
+scripts/
+tests/
+*.jpeg
+*.jpg
+*.png
+ga4tag.txt
+カードで学習塾_春期講習編_ルールブックFRESH.md
+calcModePlan.md
+calcModeRequirement.txt
+readyToCreatePRODifficulty.md
+task.md
+docs/calcModePlan.md
+docs/calcModeRequirement.txt
+docs/readyToCreatePRODifficulty.md
+docs/old-task.md
+
+# Local/agent configuration copied from previous workspaces
+.claude/
+.agents/
+Claude.md
+
+# Local crop tool
+game/css/crop-tool.css
+scripts/crop-tool.html
+scripts/crop-tool.js
+tests/crop-tool.spec.js
+
+# IDE
+.vscode/
+.idea/
