@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "test:game": "playwright test --config=playwright.game.config.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.42.0"

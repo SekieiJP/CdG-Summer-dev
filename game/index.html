@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>カードで学習塾 夏期講習編</title>
+  <meta name="description" content="カードで学習塾 夏期講習編 - 夏期講習の最小実装">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <div id="summerApp" class="summer-app">
+    <header class="summer-header">
+      <div class="summer-brand">
+        <h1>カードで学習塾 夏期講習編</h1>
+        <p>通常期4ターンの研修と、スタッフ別講習デッキの準備を進める最小実装です。</p>
+      </div>
+      <div class="summer-header-actions">
+        <button id="summaryToggle" class="info-btn" type="button" aria-label="フェーズ詳細">📘</button>
+        <button id="menuToggle" class="info-btn" type="button" aria-label="デッキと予定">📅</button>
+      </div>
+      <div class="summer-pills">
+        <span id="turnPill" class="summer-pill">-</span>
+        <span id="phasePill" class="summer-pill">-</span>
+        <span id="poolPill" class="summer-pill">-</span>
+      </div>
+    </header>
+
+    <section class="summer-status">
+      <article class="status-item status-experience">
+        <div class="status-label">体験</div>
+        <div class="status-value" id="statusExperience">0</div>
+        <div class="status-rank-info" id="rankInfoExperience">
+          <span class="rank-label"></span>
+          <div class="rank-progress"><div class="rank-progress-fill"></div></div>
+          <span class="rank-deficit"></span>
+        </div>
+      </article>
+      <article class="status-item status-enrollment">
+        <div class="status-label">入塾</div>
+        <div class="status-value" id="statusEnrollment">0</div>
+        <div class="status-rank-info" id="rankInfoEnrollment">
+          <span class="rank-label"></span>
+          <div class="rank-progress"><div class="rank-progress-fill"></div></div>
+          <span class="rank-deficit"></span>
+        </div>
+      </article>
+      <article class="status-item status-satisfaction">
+        <div class="status-label">満足</div>
+        <div class="status-value" id="statusSatisfaction">3</div>
+        <div class="status-rank-info" id="rankInfoSatisfaction">
+          <span class="rank-label"></span>
+          <div class="rank-progress"><div class="rank-progress-fill"></div></div>
+          <span class="rank-deficit"></span>
+        </div>
+      </article>
+      <article class="status-item status-accounting">
+        <div class="status-label">経理</div>
+        <div class="status-value" id="statusAccounting">3</div>
+        <div class="status-rank-info" id="rankInfoAccounting">
+          <span class="rank-label"></span>
+          <div class="rank-progress"><div class="rank-progress-fill"></div></div>
+          <span class="rank-deficit"></span>
+        </div>
+      </article>
+    </section>
+
+    <main class="summer-main">
+      <nav class="turn-timeline" id="turnTimeline" aria-label="13ターンの予定"></nav>
+
+      <section id="trainingArea" class="phase-area">
+        <div class="phase-head">
+          <h2>通常期 研修</h2>
+          <p>4回の研修で手札をそろえます。</p>
+          <div class="phase-meta">
+            <span>残り <strong id="nPoolCount">5</strong> 枚の N プール</span>
+            <span id="activeDifficultyLabel">FRESH</span>
+          </div>
+        </div>
+        <div id="trainingChoices" class="choice-grid"></div>
+        <div id="handGrid" class="hand-grid"></div>
+      </section>
+
+      <section id="actionArea" class="phase-area hidden">
+        <div class="phase-head">
+          <h2>通常期 教室行動</h2>
+          <p>手札から3枚を配置します。余ったスタッフは N プールで補完されます。</p>
+        </div>
+        <div id="staffGrid" class="staff-grid"></div>
+        <div id="nPoolSummary" class="n-pool-summary"></div>
+        <div id="handGridAction" class="hand-grid"></div>
+        <button id="actionConfirm" class="btn-primary" type="button">教室行動を確定</button>
+      </section>
+
+      <section id="meetingArea" class="phase-area hidden">
+        <div class="phase-head">
+          <h2>通常期 教室会議</h2>
+          <p>スタッフ別講習デッキにカードを移します。</p>
+        </div>
+        <div id="meetingSummary" class="meeting-summary">
+          <div class="meeting-summary-item">Nプールからの補完をここで確定します。</div>
+        </div>
+        <button id="meetingConfirm" class="btn-primary" type="button">次のターンへ</button>
+      </section>
+
+      <section id="resultArea" class="phase-area hidden">
+        <div class="phase-head">
+          <h2>結果</h2>
+          <p id="resultRank">-</p>
+          <p id="resultTurn">-</p>
+        </div>
+        <ul id="resultSummary" class="result-summary"></ul>
+      </section>
+    </main>
+
+    <aside class="log-area">
+      <div class="log-header">
+        <span>ログ</span>
+        <button id="animationClose" class="info-btn" type="button">閉じる</button>
+      </div>
+      <div class="log-content">
+        <div id="logMessages" class="log-messages"></div>
+      </div>
+    </aside>
+
+    <div id="startOverlay" class="overlay">
+      <div class="overlay-content">
+        <h1>カードで学習塾</h1>
+        <h2>夏期講習編</h2>
+        <p>まずは難易度を選んで開始してください。</p>
+        <div class="difficulty-buttons">
+          <button id="difficultyFresh" class="difficulty-btn selected" type="button">
+            <span class="difficulty-name">FRESH</span>
+            <span class="difficulty-desc">基本難易度</span>
+          </button>
+          <button id="difficultyPro" class="difficulty-btn" type="button">
+            <span class="difficulty-name">PRO</span>
+            <span class="difficulty-desc">上級難易度</span>
+          </button>
+        </div>
+        <button id="startGame" class="btn-primary btn-large" type="button">ゲーム開始</button>
+        <div class="summer-start-note">
+          <span id="previewDifficultyLabel">FRESH</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="phaseOverlay" class="info-overlay hidden" aria-hidden="true">
+      <div class="info-overlay-panel">
+        <div class="info-overlay-header">
+          <h2 id="phaseName">フェーズ詳細</h2>
+          <button class="info-btn" type="button" data-close="#phaseOverlay">×</button>
+        </div>
+        <p id="phaseDescription">-</p>
+        <dl class="phase-detail-grid">
+          <div><dt>ターン</dt><dd id="turnDetailLabel">-</dd></div>
+          <div><dt>区分</dt><dd id="turnDetailSeason">-</dd></div>
+          <div><dt>フェーズ</dt><dd id="turnDetailPhase">-</dd></div>
+          <div><dt>使用プール</dt><dd id="turnDetailPool">-</dd></div>
+          <div><dt>準備回数</dt><dd id="turnDetailPrep">-</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div id="menuOverlay" class="info-overlay hidden" aria-hidden="true">
+      <div class="info-overlay-panel wide">
+        <div class="info-overlay-header">
+          <h2>デッキと予定</h2>
+          <button class="info-btn" type="button" data-close="#menuOverlay">×</button>
+        </div>
+        <div id="menuDecks" class="deck-grid"></div>
+        <ol id="scheduleList" class="schedule-list"></ol>
+      </div>
+    </div>
+
+    <div id="statusOverlay" class="status-overlay hidden" aria-hidden="true">
+      <div class="animation-content">
+        <div id="animationHeader" class="animation-header"></div>
+        <div id="animationCards" class="animation-cards"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

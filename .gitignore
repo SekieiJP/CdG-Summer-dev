@@ -11,6 +11,8 @@ test-results/
 # Spring reference assets kept locally during Summer planning.
 # Do not publish these until they are intentionally copied/reworked as Summer assets.
 game/
+!game/
+!game/**
 solver/
 gas/
 scripts/
@@ -18,6 +20,7 @@ tests/
 *.jpeg
 *.jpg
 *.png
+!game/data/cardIcon/*.png
 ga4tag.txt
 カードで学習塾_春期講習編_ルールブックFRESH.md
 calcModePlan.md
