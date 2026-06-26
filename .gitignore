@@ -8,6 +8,9 @@ node_modules/
 playwright-report/
 test-results/
 
+# Local spring reference source kept untracked
+Spring-resource/
+
 # Spring reference assets kept locally during Summer planning.
 # Do not publish these until they are intentionally copied/reworked as Summer assets.
 game/

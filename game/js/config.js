@@ -134,7 +134,7 @@ export const DIFFICULTY_CONFIG = {
   fresh: {
     label: 'FRESH',
     cardCsv: './data/cards_fresh.csv',
-    rankCsv: './data/rankFresh.csv',
+    rankCsv: './data/rankSummerFresh.csv',
     initialStats: {
       experience: 0,
       enrollment: 0,
@@ -146,7 +146,7 @@ export const DIFFICULTY_CONFIG = {
   pro: {
     label: 'PRO',
     cardCsv: './data/cards_pro.csv',
-    rankCsv: './data/rankPro.csv',
+    rankCsv: './data/rankSummerPro.csv',
     initialStats: {
       experience: 0,
       enrollment: 0,
@@ -163,4 +163,3 @@ export const STAT_KEYS = [
   { key: 'satisfaction', label: '満足', short: '満' },
   { key: 'accounting', label: '経理', short: '経' },
 ];
-
