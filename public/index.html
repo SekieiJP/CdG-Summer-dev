@@ -7,17 +7,20 @@
   <style>
     :root {
       color-scheme: light;
-      --ink: #1f2933;
-      --muted: #64717f;
-      --line: #d8dee6;
+      --bg: #eef2f6;
       --panel: #ffffff;
-      --page: #f5f7fa;
-      --blue: #2f6fed;
-      --green: #16815f;
-      --yellow: #b7791f;
-      --red: #c2413b;
-      --violet: #6d5bd0;
-      --shadow: 0 10px 28px rgba(28, 39, 54, 0.12);
+      --panel-soft: #f8fafc;
+      --line: #d7dee8;
+      --text: #1f2937;
+      --muted: #66758a;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green: #15803d;
+      --green-soft: #dcfce7;
+      --yellow-soft: #fef3c7;
+      --rose-soft: #ffe4e6;
+      --shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      --radius: 8px;
     }
 
     * {
@@ -27,71 +30,102 @@
     body {
       margin: 0;
       min-width: 320px;
-      background: var(--page);
-      color: var(--ink);
+      background: var(--bg);
+      color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      letter-spacing: 0;
     }
 
     button {
       font: inherit;
+      color: inherit;
     }
 
     .app {
       min-height: 100vh;
       display: grid;
-      grid-template-columns: 280px minmax(0, 1fr) 320px;
+      grid-template-columns: 248px minmax(0, 1fr);
       grid-template-rows: auto 1fr;
     }
 
     header {
       grid-column: 1 / -1;
-      min-height: 68px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 18px;
-      padding: 14px 22px;
-      background: #fff;
+      gap: 14px;
+      padding: 12px 18px;
       border-bottom: 1px solid var(--line);
+      background: #fff;
     }
 
-    h1 {
+    .brand h1 {
       margin: 0;
       font-size: 20px;
-      line-height: 1.25;
-      font-weight: 750;
+      line-height: 1.2;
+      font-weight: 800;
     }
 
-    .header-meta {
+    .brand-copy {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .header-actions {
       display: flex;
       align-items: center;
       gap: 10px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      color: var(--muted);
-      font-size: 13px;
     }
 
-    .pill {
+    .summary-toggle,
+    .menu-button {
+      border: 1px solid var(--line);
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .summary-toggle {
+      min-width: 212px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      text-align: left;
+    }
+
+    .summary-item {
+      display: grid;
+      gap: 3px;
+    }
+
+    .summary-item span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+
+    .summary-item strong {
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .menu-button {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius);
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 28px;
-      padding: 4px 10px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: #fff;
-      white-space: nowrap;
-    }
-
-    aside,
-    main {
-      min-height: 0;
+      font-size: 18px;
+      box-shadow: var(--shadow);
     }
 
     .turn-nav {
-      padding: 16px;
+      min-height: 0;
+      padding: 14px;
       border-right: 1px solid var(--line);
       background: #fff;
       overflow: auto;
@@ -114,33 +148,30 @@
       display: grid;
       grid-template-columns: 34px minmax(0, 1fr);
       gap: 10px;
-      align-items: center;
-      min-height: 52px;
+      min-height: 56px;
       padding: 8px;
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: var(--radius);
       background: #fff;
-      color: var(--ink);
       text-align: left;
       cursor: pointer;
     }
 
     .turn-button[aria-current="true"] {
       border-color: var(--blue);
-      box-shadow: 0 0 0 2px rgba(47, 111, 237, 0.14);
+      background: #eff6ff;
     }
 
     .turn-no {
+      width: 34px;
+      height: 34px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      background: #edf2f7;
-      color: #334155;
-      font-weight: 800;
+      border-radius: 999px;
+      background: #e2e8f0;
       font-size: 13px;
+      font-weight: 800;
     }
 
     .turn-button[aria-current="true"] .turn-no {
@@ -151,7 +182,7 @@
     .turn-title {
       display: block;
       font-size: 14px;
-      font-weight: 720;
+      font-weight: 750;
       line-height: 1.2;
     }
 
@@ -164,50 +195,52 @@
     }
 
     .workspace {
-      padding: 18px;
+      min-height: 0;
+      padding: 14px;
       overflow: auto;
     }
 
     .phase-tabs {
       display: flex;
       gap: 8px;
+      margin-bottom: 12px;
       overflow-x: auto;
-      padding-bottom: 10px;
     }
 
     .phase-tab {
-      min-height: 38px;
-      padding: 7px 12px;
+      min-height: 36px;
+      padding: 6px 12px;
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 999px;
       background: #fff;
-      color: var(--ink);
       white-space: nowrap;
       cursor: pointer;
     }
 
     .phase-tab[aria-selected="true"] {
-      background: var(--ink);
-      border-color: var(--ink);
+      background: var(--text);
+      border-color: var(--text);
       color: #fff;
     }
 
-    .stage {
+    .layout {
       display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.85fr);
       gap: 14px;
     }
 
-    .summary {
+    .stack {
       display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
       gap: 14px;
+      min-height: 0;
     }
 
     .panel {
-      background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: var(--radius);
+      background: var(--panel);
       box-shadow: var(--shadow);
+      overflow: hidden;
     }
 
     .panel-header {
@@ -215,28 +248,364 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 14px 16px;
+      padding: 12px 14px;
       border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
     }
 
     .panel-title {
       margin: 0;
-      font-size: 16px;
-      line-height: 1.25;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .panel-meta {
+      color: var(--muted);
+      font-size: 12px;
     }
 
     .panel-body {
-      padding: 16px;
+      padding: 14px;
     }
 
-    .large-status {
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .status-card {
+      min-height: 72px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .status-card span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status-card strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .token-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .token-card {
+      min-height: 58px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .token-card span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .token-card strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 18px;
+    }
+
+    .hand-area {
       display: grid;
       gap: 12px;
     }
 
+    .hand-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .hand-slot {
+      min-height: 138px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .hand-slot.pending {
+      background: #f8fafc;
+      border-style: dashed;
+    }
+
+    .hand-slot.new-card {
+      animation: slide-in 420ms ease;
+      border-color: var(--green);
+      background: var(--green-soft);
+    }
+
+    @keyframes slide-in {
+      from {
+        opacity: 0;
+        transform: translateX(48px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .card-tag {
+      display: inline-flex;
+      width: fit-content;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #e0e7ff;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .card-tag.sr {
+      background: var(--yellow-soft);
+    }
+
+    .card-tag.ssr {
+      background: var(--rose-soft);
+    }
+
+    .hand-slot strong,
+    .choice-card strong,
+    .deck-item strong {
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .hand-slot p,
+    .choice-card p,
+    .deck-item p,
+    .mini-card {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .choice-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .choice-button {
+      min-height: 92px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      display: grid;
+      gap: 8px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .choice-button.active {
+      border-color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .choice-note {
+      padding: 10px;
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .staff-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .staff-slot {
+      min-height: 152px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .staff-slot.rest {
+      border-style: dashed;
+      background: #fff9db;
+    }
+
+    .staff-slot h3 {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .mini-card {
+      padding: 8px;
+      border-radius: 5px;
+      background: #f1f5f9;
+    }
+
+    .deck-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .deck-column {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .deck-head {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .deck-list {
+      display: grid;
+      gap: 6px;
+      padding: 8px;
+    }
+
+    .deck-item {
+      padding: 8px;
+      border-radius: 5px;
+      background: #eef2f7;
+    }
+
+    .deck-item.sr {
+      background: var(--yellow-soft);
+    }
+
+    .deck-item.ssr {
+      background: var(--rose-soft);
+    }
+
+    .deck-item.used {
+      background: #4b5563;
+      color: #f9fafb;
+    }
+
+    .deck-item.used p {
+      color: #e5e7eb;
+    }
+
+    .schedule-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .schedule-item {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .schedule-item.current {
+      border-color: var(--blue);
+      background: #eff6ff;
+    }
+
+    .checks,
+    .log {
+      display: grid;
+      gap: 8px;
+    }
+
+    .check-item,
+    .log-line {
+      padding: 9px 10px;
+      border-left: 3px solid var(--blue);
+      background: #f8fafc;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .footer-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    .action-button {
+      min-height: 38px;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .action-button.primary {
+      border-color: var(--blue);
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, 0.44);
+      z-index: 10;
+    }
+
+    .overlay.open {
+      display: flex;
+    }
+
+    .overlay-card {
+      width: min(920px, 100%);
+      max-height: calc(100vh - 40px);
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.2);
+    }
+
+    .overlay-body {
+      padding: 14px;
+      display: grid;
+      gap: 14px;
+    }
+
     .phase-name {
       margin: 0;
-      font-size: 28px;
+      font-size: 26px;
       line-height: 1.15;
       font-weight: 800;
     }
@@ -245,17 +614,17 @@
       margin: 0;
       color: var(--muted);
       font-size: 14px;
-      line-height: 1.7;
+      line-height: 1.65;
     }
 
     .flow-line {
       display: grid;
-      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
     }
 
     .flow-step {
-      min-height: 70px;
+      min-height: 66px;
       padding: 10px;
       border: 1px solid var(--line);
       border-radius: 6px;
@@ -269,8 +638,8 @@
 
     .flow-step strong {
       display: block;
-      font-size: 13px;
       margin-bottom: 6px;
+      font-size: 13px;
     }
 
     .flow-step span {
@@ -279,300 +648,25 @@
       line-height: 1.35;
     }
 
-    .metrics {
+    .two-column {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-    }
-
-    .metric {
-      min-height: 72px;
-      padding: 10px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-    }
-
-    .metric span {
-      display: block;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .metric strong {
-      display: block;
-      margin-top: 7px;
-      font-size: 22px;
-    }
-
-    .mock-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 14px;
     }
 
-    .cards-row,
-    .deck-columns,
-    .token-row {
-      display: grid;
-      gap: 10px;
-    }
-
-    .cards-row {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .mock-card {
-      min-height: 116px;
-      padding: 11px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-      display: grid;
-      align-content: start;
-      gap: 8px;
-    }
-
-    .mock-card.selected {
-      border-color: var(--green);
-      background: #ecfdf5;
-    }
-
-    .mock-card.flipped {
-      color: #d8dde4;
-      background: #4b5563;
-      border-color: #4b5563;
-    }
-
-    .card-tag {
-      display: inline-flex;
-      width: fit-content;
-      padding: 3px 7px;
-      border-radius: 999px;
-      background: #eef2ff;
-      color: #334155;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .mock-card strong {
-      font-size: 14px;
-      line-height: 1.25;
-    }
-
-    .mock-card p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.45;
-    }
-
-    .mock-card.flipped p {
-      color: #e5e7eb;
-    }
-
-    .staff-slots {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    .staff-slot {
-      min-height: 148px;
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-      display: grid;
-      gap: 8px;
-      align-content: start;
-    }
-
-    .staff-slot.rest {
-      border-style: dashed;
-      background: #fff8e7;
-    }
-
-    .staff-slot h3 {
-      margin: 0;
-      font-size: 14px;
-    }
-
-    .mini-card {
-      padding: 8px;
-      border-radius: 5px;
-      background: #f1f5f9;
-      font-size: 12px;
-      line-height: 1.35;
-    }
-
-    .deck-columns {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-
-    .deck-column {
-      min-height: 230px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-      overflow: hidden;
-    }
-
-    .deck-head {
-      padding: 9px 10px;
-      background: #f8fafc;
-      border-bottom: 1px solid var(--line);
-      font-size: 13px;
-      font-weight: 750;
-    }
-
-    .deck-list {
-      padding: 8px;
-      display: grid;
-      gap: 6px;
-    }
-
-    .deck-item {
-      min-height: 42px;
-      padding: 7px;
-      border-radius: 5px;
-      background: #eef2f7;
-      font-size: 12px;
-      line-height: 1.3;
-    }
-
-    .deck-item.sr {
-      background: #fef3c7;
-    }
-
-    .deck-item.ssr {
-      background: #fce7f3;
-    }
-
-    .deck-item.used {
-      background: #4b5563;
-      color: #f3f4f6;
-    }
-
-    .token-row {
-      grid-template-columns: repeat(3, 1fr);
-    }
-
-    .token {
-      min-height: 68px;
-      padding: 10px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-    }
-
-    .token span {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .token strong {
-      display: block;
-      margin-top: 6px;
-      font-size: 20px;
-    }
-
-    .side {
-      border-left: 1px solid var(--line);
-      background: #fff;
-      padding: 16px;
-      overflow: auto;
-    }
-
-    .compact-list {
-      margin: 0;
-      padding-left: 18px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.6;
-    }
-
-    .log {
-      display: grid;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .log-line {
-      padding: 8px;
-      border-left: 3px solid var(--blue);
-      background: #f8fafc;
-      font-size: 12px;
-      color: #344054;
-      line-height: 1.45;
-    }
-
-    .actions {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 12px;
-    }
-
-    .action-button {
-      min-height: 36px;
-      padding: 7px 12px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-      color: var(--ink);
-      cursor: pointer;
-    }
-
-    .action-button.primary {
-      border-color: var(--blue);
-      background: var(--blue);
-      color: #fff;
-    }
-
-    .mode-toggle {
-      display: inline-flex;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      overflow: hidden;
-    }
-
-    .mode-toggle button {
-      min-height: 32px;
-      padding: 5px 10px;
-      border: 0;
-      border-right: 1px solid var(--line);
-      background: #fff;
-      cursor: pointer;
-    }
-
-    .mode-toggle button:last-child {
-      border-right: 0;
-    }
-
-    .mode-toggle button.active {
-      background: var(--ink);
-      color: #fff;
-    }
-
     @media (max-width: 1120px) {
-      .app {
-        grid-template-columns: 240px minmax(0, 1fr);
-      }
-
-      .side {
-        grid-column: 1 / -1;
-        border-left: 0;
-        border-top: 1px solid var(--line);
-      }
-
-      .summary,
-      .mock-grid {
+      .layout,
+      .two-column {
         grid-template-columns: 1fr;
       }
+
+      .status-grid,
+      .token-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
-    @media (max-width: 760px) {
+    @media (max-width: 820px) {
       .app {
         display: block;
       }
@@ -580,6 +674,11 @@
       header {
         align-items: flex-start;
         flex-direction: column;
+      }
+
+      .header-actions {
+        width: 100%;
+        justify-content: space-between;
       }
 
       .turn-nav {
@@ -592,17 +691,39 @@
         overflow-x: auto;
       }
 
-      .flow-line,
-      .cards-row,
-      .staff-slots,
+      .summary-toggle {
+        min-width: 0;
+        width: calc(100% - 52px);
+      }
+
+      .hand-grid,
+      .status-grid,
+      .token-row,
+      .deck-columns {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .staff-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 620px) {
+      .choice-grid,
+      .hand-grid,
       .deck-columns,
-      .metrics,
-      .token-row {
+      .flow-line {
         grid-template-columns: 1fr;
       }
 
+      .status-grid,
+      .token-row,
+      .staff-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .phase-name {
-        font-size: 24px;
+        font-size: 22px;
       }
     }
   </style>
@@ -610,18 +731,17 @@
 <body>
   <div class="app">
     <header>
-      <div>
+      <div class="brand">
         <h1>カードで学習塾 夏期講習編</h1>
-        <div class="header-meta">
-          <span>全体フローモック</span>
-          <span class="pill">FRESH / PRO</span>
-          <span class="pill">通常期4ターン + 講習期9ターン</span>
-        </div>
+        <div class="brand-copy">春期講習の画面密度を踏襲した全体フローモック</div>
       </div>
-      <div class="header-meta">
-        <span class="pill" id="periodPill">通常期</span>
-        <span class="pill" id="turnPill">5月下旬</span>
-        <span class="pill" id="phasePill">研修</span>
+      <div class="header-actions">
+        <button type="button" class="summary-toggle" id="summaryToggle" aria-haspopup="dialog" aria-controls="phaseOverlay" aria-expanded="false">
+          <span class="summary-item"><span>期</span><strong id="periodPill">通常期</strong></span>
+          <span class="summary-item"><span>ターン</span><strong id="turnPill">5月下旬</strong></span>
+          <span class="summary-item"><span>フェーズ</span><strong id="phasePill">研修</strong></span>
+        </button>
+        <button type="button" class="menu-button" id="menuToggle" aria-label="デッキと予定を表示" aria-haspopup="dialog" aria-controls="menuOverlay" aria-expanded="false">🗂️</button>
       </div>
     </header>
 
@@ -632,79 +752,103 @@
 
     <main class="workspace">
       <div class="phase-tabs" id="phaseTabs"></div>
-      <div class="stage">
-        <section class="summary">
-          <div class="panel">
-            <div class="panel-header">
-              <h2 class="panel-title">現在のフェーズ</h2>
-              <span class="pill" id="phaseCount">1 / 13</span>
-            </div>
-            <div class="panel-body large-status">
-              <p class="phase-name" id="phaseName">研修フェーズ</p>
-              <p class="phase-copy" id="phaseDescription"></p>
-              <div class="flow-line" id="flowLine"></div>
-            </div>
-          </div>
-          <div class="panel">
+      <div class="layout">
+        <div class="stack">
+          <section class="panel">
             <div class="panel-header">
               <h2 class="panel-title">ステータス</h2>
-              <span class="pill">モック値</span>
+              <span class="panel-meta">春期準拠のコンパクト表示</span>
             </div>
             <div class="panel-body">
-              <div class="metrics">
-                <div class="metric"><span>体験</span><strong id="mExp">0</strong></div>
-                <div class="metric"><span>入塾</span><strong id="mEnroll">0</strong></div>
-                <div class="metric"><span>満足</span><strong id="mSat">3</strong></div>
-                <div class="metric"><span>経理</span><strong id="mAcc">3</strong></div>
+              <div class="status-grid">
+                <div class="status-card"><span>体験</span><strong id="mExp">0</strong></div>
+                <div class="status-card"><span>入塾</span><strong id="mEnroll">0</strong></div>
+                <div class="status-card"><span>満足</span><strong id="mSat">3</strong></div>
+                <div class="status-card"><span>経理</span><strong id="mAcc">3</strong></div>
+              </div>
+              <div class="token-row">
+                <div class="token-card"><span>情熱</span><strong id="tPassion">3</strong></div>
+                <div class="token-card"><span>発想</span><strong id="tIdea">0</strong></div>
+                <div class="token-card"><span>整理</span><strong id="tOrganize">0</strong></div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="mock-grid">
-          <div class="panel">
+          <section class="panel">
             <div class="panel-header">
-              <h2 class="panel-title" id="mainPanelTitle">フェーズ画面</h2>
-              <div class="mode-toggle" aria-label="スタッフ別デッキ表示切替">
-                <button type="button" class="active">タブ</button>
-                <button type="button">全体</button>
-              </div>
+              <h2 class="panel-title" id="mainPanelTitle">5月下旬 / 研修</h2>
+              <span class="panel-meta" id="phaseCount">1 / 13</span>
             </div>
             <div class="panel-body" id="mockContent"></div>
-          </div>
+            <div class="panel-body" style="padding-top: 0;">
+              <div class="footer-actions">
+                <button class="action-button" type="button" id="prevButton">戻る</button>
+                <button class="action-button primary" type="button" id="nextButton">次のフェーズ</button>
+              </div>
+            </div>
+          </section>
+        </div>
 
-          <div class="panel">
+        <div class="stack">
+          <section class="panel">
             <div class="panel-header">
-              <h2 class="panel-title">公開デッキ</h2>
-              <span class="pill">常時公開</span>
+              <h2 class="panel-title">確認ポイント</h2>
+              <span class="panel-meta">実装前の論点</span>
             </div>
             <div class="panel-body">
-              <div class="deck-columns" id="deckColumns"></div>
+              <div class="checks" id="checkpoints"></div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="panel-title">ログ</h2>
+              <span class="panel-meta">遷移イメージ</span>
+            </div>
+            <div class="panel-body">
+              <div class="log" id="log"></div>
+            </div>
+          </section>
+        </div>
       </div>
     </main>
+  </div>
 
-    <aside class="side">
-      <p class="section-label">PRO講習期トークン</p>
-      <div class="token-row">
-        <div class="token"><span>情熱</span><strong id="tPassion">3</strong></div>
-        <div class="token"><span>発想</span><strong id="tIdea">0</strong></div>
-        <div class="token"><span>整理</span><strong id="tOrganize">0</strong></div>
+  <div class="overlay" id="phaseOverlay" aria-hidden="true">
+    <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="phaseName">
+      <div class="panel-header">
+        <h2 class="panel-title">現在のフェーズ</h2>
+        <button type="button" class="action-button" data-close="#phaseOverlay">閉じる</button>
       </div>
-
-      <div class="actions">
-        <button class="action-button primary" type="button" id="nextButton">次のフェーズ</button>
-        <button class="action-button" type="button" id="prevButton">戻る</button>
+      <div class="overlay-body">
+        <div>
+          <p class="phase-name" id="phaseName">研修フェーズ</p>
+          <p class="phase-copy" id="phaseDescription"></p>
+        </div>
+        <div class="flow-line" id="flowLine"></div>
       </div>
+    </div>
+  </div>
 
-      <p class="section-label" style="margin-top: 18px;">確認ポイント</p>
-      <ul class="compact-list" id="checkpoints"></ul>
-
-      <p class="section-label" style="margin-top: 18px;">ログ</p>
-      <div class="log" id="log"></div>
-    </aside>
+  <div class="overlay" id="menuOverlay" aria-hidden="true">
+    <div class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+      <div class="panel-header">
+        <h2 class="panel-title" id="menuTitle">デッキと予定</h2>
+        <button type="button" class="action-button" data-close="#menuOverlay">閉じる</button>
+      </div>
+      <div class="overlay-body">
+        <div class="two-column">
+          <section>
+            <p class="section-label">現在のデッキ</p>
+            <div class="deck-columns" id="deckColumns"></div>
+          </section>
+          <section>
+            <p class="section-label">今後のスケジュール</p>
+            <div class="schedule-list" id="scheduleList"></div>
+          </section>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -724,18 +868,33 @@
       { name: '後期4日目', period: '講習期', phases: ['教室行動', '教室会議', '結果'] }
     ];
 
+    const trainingChoices = [
+      { key: '動員', rarity: 'R', title: '地域チラシ配布', desc: '体験+2。通常期おすすめでさらに体験+2' },
+      { key: '教務', rarity: 'SR', title: '講習カリキュラム設計', desc: '入塾+3。講習期は使用後に裏返し' },
+      { key: '応対', rarity: 'R', title: '保護者フォロー', desc: '満足+2' },
+      { key: '庶務', rarity: 'SSR', title: '備品注文の最適化', desc: '経理+4。強力だが使用後に裏返し' }
+    ];
+
     const samples = {
-      hand: [
-        ['動員 R', '地域チラシ配布', '体験+2。通常期おすすめでさらに体験+2'],
-        ['教務 SR', '講習カリキュラム設計', '入塾+3。講習期は使用後に裏返し'],
-        ['応対 R', '保護者フォロー', '満足+2'],
-        ['庶務 SSR', '備品注文の最適化', '経理+4。強力だが使用後に裏返し']
-      ],
       decks: {
-        '室長': ['問合対応の基本', '地域チラシ配布', '講習説明会'],
-        '講師': ['質問対応の基本', '講習カリキュラム設計', '補習計画'],
-        '事務': ['経理精算の基本', '保護者フォロー', '備品注文の最適化'],
-        'アルバイト': ['自習室サポート']
+        '室長': [
+          { rarity: 'N', title: '問合対応の基本', desc: '通常期補完カード' },
+          { rarity: 'R', title: '地域チラシ配布', desc: '体験+2' },
+          { rarity: 'SR', title: '講習説明会', desc: '体験+3 / 満足+1' }
+        ],
+        '講師': [
+          { rarity: 'N', title: '質問対応の基本', desc: '通常期補完カード' },
+          { rarity: 'SR', title: '講習カリキュラム設計', desc: '入塾+3' },
+          { rarity: 'R', title: '補習計画', desc: '入塾+1 / 満足+1' }
+        ],
+        '事務': [
+          { rarity: 'N', title: '経理精算の基本', desc: '通常期補完カード' },
+          { rarity: 'R', title: '保護者フォロー', desc: '満足+2' },
+          { rarity: 'SSR', title: '備品注文の最適化', desc: '経理+4' }
+        ],
+        'アルバイト': [
+          { rarity: 'R', title: '自習室サポート', desc: '満足+1 / 講師可のみ' }
+        ]
       }
     };
 
@@ -745,134 +904,203 @@
       if (phaseName === '研修') {
         return {
           title: '研修フェーズ',
-          desc: `${turn.pool}研修プールの4カテゴリから、カテゴリを選んで1枚引く操作を4回行い、手札4枚を作る。`,
-          checkpoints: ['同じカテゴリを連続選択できる', '引いたカードは自分のみ確認', '山札はカテゴリ×地域/全校の8山構成']
+          desc: `${turn.pool}研修プールの4カテゴリから1枚ずつではなく、カテゴリを都度選びながら4回引いて手札4枚を作る。獲得カードは画面内へスライドインし、次の四択をそのまま続行する。`,
+          checkpoints: ['四択ボタンは常に1画面内へ収める', '獲得演出後もスクロール遷移なしで次の選択へ進む', '春期講習と同じ密度で手札4枠を上段固定する']
         };
       }
       if (phaseName === '教室行動' && turn.period === '通常期') {
         return {
           title: '通常期 教室行動フェーズ',
-          desc: '手札4枚から3枚を室長/講師/事務に配置する。未割当スタッフにはNプールから1枚を選んで補完する。',
-          checkpoints: ['通常期おすすめ: 動員→体験+2、庶務→経理+2', 'Nカードも講習デッキへ移動', '並行カードだけ重ね配置できる']
+          desc: '手札4枚から3枚を室長・講師・事務へ配置し、未割当はNプールから補完する。縦画面では4スタッフ枠を2列×2行で表示する。',
+          checkpoints: ['おすすめボーナスは表示だけでなく後続ロジックに接続する前提で領域を確保', '余りカードの扱いを同画面で把握できる', '縦画面で4枠を1列縦積みにしない']
         };
       }
       if (phaseName === '教室会議' && turn.period === '通常期') {
         return {
           title: '通常期 教室会議フェーズ',
-          desc: '配置済みカードを各スタッフの講習デッキへ移動し、余りカードは条件を満たせばアルバイト講師デッキへ入れる。',
-          checkpoints: ['講習デッキは常時公開', 'アルバイト講師デッキはR/SRかつ講師可', '移動しない余りカードは除外']
+          desc: '配置済みカードをスタッフ別講習デッキへ移し、余りカードは条件を満たす場合のみアルバイト講師デッキへ入れる。',
+          checkpoints: ['公開デッキはヘッダーメニューから確認する', '画面本体は選択と結果確認に集中させる', 'アルバイト候補の条件不一致はその場で説明可能にする']
         };
       }
       if (phaseName === '講習期準備') {
         return {
           title: '講習期準備フェーズ',
           desc: `8山札から1山を選び、トップ3枚から1枚を選んで既存カードと交換する。このターンは${turn.prep}回実行する。`,
-          checkpoints: ['前期1日目は3回', '後期1日目は2回', '交換相手は同一レアリティ以下']
+          checkpoints: ['前期1日目は3回、後期1日目は2回', '交換対象の比較情報を同一オーバーレイで見せられる構成にする', '公開デッキ確認はメニュー導線に寄せる']
         };
       }
       if (phaseName === '教室行動') {
         return {
           title: '講習期 教室行動フェーズ',
-          desc: '3スタッフ別講習デッキとアルバイト講師デッキから各1枚を選んで実行する。休む選択も可能。',
-          checkpoints: ['講習期おすすめ: 教務→入塾+2、応対→満足+2', 'SR/SSRは使用後に裏返し', '休んだスタッフは会議で復活判定']
+          desc: '室長・講師・事務・アルバイトの4デッキから1枚ずつ選んで実行する。休む場合も同じスタッフ枠内で示す。',
+          checkpoints: ['4スタッフ表示は縦画面で2列×2行', 'SR/SSRの裏返し状態はカード色と文言で判別可能にする', '講習期おすすめの反映先を明示する']
         };
       }
       if (phaseName === '教室会議') {
         return {
           title: '講習期 教室会議フェーズ',
-          desc: turn.ssr ? '休んだスタッフのSRを復活し、中期2日両方休んだスタッフのSSRも復活する。PROではトークン消費操作を行う。' : '休んだスタッフのSRを復活する。PROでは情熱/発想/整理トークンを消費できる。',
-          checkpoints: ['SRはそのターン休めば復活', 'SSRは中期1日目と2日目を両方休むと復活', '情熱=復活、発想=追加獲得、整理=削除']
+          desc: turn.ssr ? '休んだスタッフのSRを復活し、中期2日間とも休んだスタッフのSSRも復活する。PROではトークン消費操作を行う。' : '休んだスタッフのSRを復活する。PROでは情熱・発想・整理トークンを消費できる。',
+          checkpoints: ['復活判定の説明はフェーズ詳細オーバーレイで確認できる', 'トークン値は常時ステータスで参照できる', '画面本体はスタッフ別結果確認を優先する']
         };
       }
       return {
         title: '結果画面',
-        desc: '通常期+講習期で累積した4指標を夏期rank CSVで評価し、総合ランクを表示する。',
-        checkpoints: ['rankSummerFresh / rankSummerProを使用', 'ゲーム終了時追加処理なし', 'ハイスコアキーはcdg_summer_highscore_{difficulty}']
+        desc: '通常期と講習期で累積した4指標を夏期rank CSVで評価し、総合ランクを表示する。',
+        checkpoints: ['rankSummerFresh / rankSummerPro を使う前提の表示', '春期と同様に結果指標を先に見せ、その後総合ランクを示す', '保存キーは cdg_summer_highscore_{difficulty}']
       };
     }
 
-    function cardHtml(card, index, extra = '') {
-      return `<div class="mock-card ${extra}">
-        <span class="card-tag">${card[0]}</span>
-        <strong>${card[1]}</strong>
-        <p>${card[2]}</p>
-      </div>`;
+    function getRarityClass(rarity) {
+      if (rarity === 'SR') return 'sr';
+      if (rarity === 'SSR') return 'ssr';
+      return '';
+    }
+
+    function renderTrainingHand(turnIndex) {
+      return trainingChoices.map((card, index) => {
+        const gained = index < Math.min(turnIndex + 1, 4);
+        const slotClass = gained ? `hand-slot ${index === Math.min(turnIndex, 3) ? 'new-card' : ''}` : 'hand-slot pending';
+        const body = gained
+          ? `<span class="card-tag ${getRarityClass(card.rarity)}">${card.key} ${card.rarity}</span><strong>${card.title}</strong><p>${card.desc}</p>`
+          : `<span class="card-tag">手札${index + 1}</span><strong>次の獲得枠</strong><p>カテゴリを選ぶとここへカードがスライドインする。</p>`;
+        return `<div class="${slotClass}">${body}</div>`;
+      }).join('');
+    }
+
+    function renderTrainingChoices() {
+      return trainingChoices.map((card, index) => `
+        <button type="button" class="choice-button ${index === 1 ? 'active' : ''}">
+          <span class="card-tag ${getRarityClass(card.rarity)}">${card.key}</span>
+          <strong>${card.title}</strong>
+          <p>${card.desc}</p>
+        </button>
+      `).join('');
+    }
+
+    function renderStaffGrid(cards) {
+      return `<div class="staff-grid">${cards.map((item) => `
+        <div class="staff-slot ${item.rest ? 'rest' : ''}">
+          <h3>${item.name}</h3>
+          <div class="mini-card">${item.body}</div>
+        </div>
+      `).join('')}</div>`;
     }
 
     function renderMock(turn, phaseName) {
       if (phaseName === '研修') {
-        return `<div class="cards-row">${samples.hand.map((card, index) => cardHtml(card, index, index === 1 ? 'selected' : '')).join('')}</div>
-          <div class="actions"><button class="action-button primary">教務を引く</button><button class="action-button">動員を引く</button><button class="action-button">応対を引く</button><button class="action-button">庶務を引く</button></div>`;
+        return `<div class="hand-area">
+          <div class="hand-grid" id="handGrid">${renderTrainingHand(state.turn)}</div>
+          <div class="choice-grid">${renderTrainingChoices()}</div>
+          <div class="choice-note">カテゴリ選択、獲得演出、手札確認を同じ画面内で完結させる。次の四択は常に下段へ残し、春期講習の手札確認テンポを維持する。</div>
+        </div>`;
       }
       if (phaseName === '教室行動' && turn.period === '通常期') {
-        return `<div class="staff-slots">
-          <div class="staff-slot"><h3>室長</h3><div class="mini-card">地域チラシ配布</div></div>
-          <div class="staff-slot"><h3>講師</h3><div class="mini-card">講習カリキュラム設計</div></div>
-          <div class="staff-slot rest"><h3>事務</h3><div class="mini-card">N: 経理精算の基本</div></div>
-          <div class="staff-slot"><h3>余り</h3><div class="mini-card">保護者フォロー</div></div>
-        </div>`;
+        return renderStaffGrid([
+          { name: '室長', body: '地域チラシ配布' },
+          { name: '講師', body: '講習カリキュラム設計' },
+          { name: '事務', body: 'N: 経理精算の基本', rest: true },
+          { name: '余り', body: '保護者フォロー' }
+        ]);
       }
       if (phaseName === '教室会議' && turn.period === '通常期') {
-        return `<div class="staff-slots">
-          <div class="staff-slot"><h3>室長デッキへ</h3><div class="mini-card">地域チラシ配布</div></div>
-          <div class="staff-slot"><h3>講師デッキへ</h3><div class="mini-card">講習カリキュラム設計</div></div>
-          <div class="staff-slot"><h3>事務デッキへ</h3><div class="mini-card">経理精算の基本</div></div>
-          <div class="staff-slot"><h3>アルバイト候補</h3><div class="mini-card">保護者フォロー: 条件不一致なら除外</div></div>
-        </div>`;
+        return renderStaffGrid([
+          { name: '室長デッキへ', body: '地域チラシ配布' },
+          { name: '講師デッキへ', body: '講習カリキュラム設計' },
+          { name: '事務デッキへ', body: '経理精算の基本' },
+          { name: 'アルバイト候補', body: '保護者フォロー: 条件不一致なら除外' }
+        ]);
       }
       if (phaseName === '講習期準備') {
-        return `<div class="cards-row">
-          ${cardHtml(['R', '自習室サポート', 'アルバイト講師デッキ候補'], 0, 'selected')}
-          ${cardHtml(['SR', '補習計画', '同一以下の既存カードと交換'], 1)}
-          ${cardHtml(['SSR', '夏期特別面談', '交換できない場合は除外'], 2)}
-          <div class="mock-card"><span class="card-tag">${turn.prep}回</span><strong>準備カウンタ</strong><p>トップ3枚から1枚を選択して交換する。</p></div>
+        return `<div class="hand-area">
+          <div class="hand-grid">
+            <div class="hand-slot new-card"><span class="card-tag">R</span><strong>自習室サポート</strong><p>アルバイト講師デッキ候補</p></div>
+            <div class="hand-slot"><span class="card-tag sr">SR</span><strong>補習計画</strong><p>同一レアリティ以下の既存カードと交換</p></div>
+            <div class="hand-slot"><span class="card-tag ssr">SSR</span><strong>夏期特別面談</strong><p>交換不可なら除外</p></div>
+            <div class="hand-slot pending"><span class="card-tag">${turn.prep}回</span><strong>準備カウンタ</strong><p>トップ3枚から1枚を選択して交換する。</p></div>
+          </div>
+          <div class="choice-note">デッキ全体はヘッダーメニューで確認し、この画面では交換候補の比較に集中させる。</div>
         </div>`;
       }
       if (phaseName === '教室行動') {
-        return `<div class="staff-slots">
-          <div class="staff-slot"><h3>室長</h3><div class="mini-card">講習説明会</div></div>
-          <div class="staff-slot"><h3>講師</h3><div class="mini-card">講習カリキュラム設計 SR</div></div>
-          <div class="staff-slot rest"><h3>事務</h3><div class="mini-card">休む</div></div>
-          <div class="staff-slot"><h3>アルバイト</h3><div class="mini-card">自習室サポート</div></div>
-        </div>`;
+        return renderStaffGrid([
+          { name: '室長', body: '講習説明会' },
+          { name: '講師', body: '講習カリキュラム設計 SR' },
+          { name: '事務', body: '休む', rest: true },
+          { name: 'アルバイト', body: '自習室サポート' }
+        ]);
       }
       if (phaseName === '教室会議') {
-        return `<div class="staff-slots">
-          <div class="staff-slot"><h3>室長</h3><div class="mini-card">SR復活なし</div></div>
-          <div class="staff-slot"><h3>講師</h3><div class="mini-card">使用SRを裏返し</div></div>
-          <div class="staff-slot rest"><h3>事務</h3><div class="mini-card">休み: SR復活</div></div>
-          <div class="staff-slot"><h3>PRO操作</h3><div class="mini-card">情熱/発想/整理を消費</div></div>
-        </div>`;
+        return renderStaffGrid([
+          { name: '室長', body: 'SR復活なし' },
+          { name: '講師', body: '使用SRを裏返し' },
+          { name: '事務', body: '休み: SR復活', rest: true },
+          { name: 'PRO操作', body: '情熱 / 発想 / 整理を消費' }
+        ]);
       }
-      return `<div class="staff-slots">
-        <div class="staff-slot"><h3>体験</h3><div class="mini-card">夏期rank CSVで評価</div></div>
-        <div class="staff-slot"><h3>入塾</h3><div class="mini-card">退塾差分を計算</div></div>
-        <div class="staff-slot"><h3>満足/経理</h3><div class="mini-card">退塾計算に使用</div></div>
-        <div class="staff-slot"><h3>総合ランク</h3><div class="mini-card">A / S / SS など</div></div>
-      </div>`;
+      return renderStaffGrid([
+        { name: '体験', body: '夏期rank CSVで評価' },
+        { name: '入塾', body: '退塾差分を計算' },
+        { name: '満足 / 経理', body: '退塾計算に使用' },
+        { name: '総合ランク', body: 'A / S / SS など' }
+      ]);
     }
 
     function renderDecks(turnIndex, phaseName) {
       const used = turnIndex > 4 && phaseName !== '講習期準備';
       return Object.entries(samples.decks).map(([name, cards]) => {
         const items = cards.map((card, idx) => {
-          const cls = idx === 1 ? 'sr' : idx === 2 ? 'ssr' : '';
-          const usedCls = used && idx === 1 && name === '講師' ? ' used' : '';
-          return `<div class="deck-item ${cls}${usedCls}">${card}</div>`;
+          const cls = `${getRarityClass(card.rarity)}${used && idx === 1 && name === '講師' ? ' used' : ''}`;
+          return `<div class="deck-item ${cls}">
+            <span class="card-tag ${getRarityClass(card.rarity)}">${card.rarity}</span>
+            <strong>${card.title}</strong>
+            <p>${card.desc}</p>
+          </div>`;
         }).join('');
         return `<div class="deck-column"><div class="deck-head">${name}</div><div class="deck-list">${items}</div></div>`;
       }).join('');
     }
 
+    function renderSchedule() {
+      return turns.map((turn, index) => `
+        <div class="schedule-item ${index === state.turn ? 'current' : ''}">
+          <strong>${index + 1}. ${turn.name}</strong><br>${turn.period}${turn.prep ? ` / 準備${turn.prep}回` : ''}
+        </div>
+      `).join('');
+    }
+
     function renderFlow(turn, phaseName) {
-      const base = turn.phases.map((phase) => ({ label: phase, desc: phase === '講習期準備' ? `${turn.prep}回実行` : '実行中の画面' }));
-      return base.map((step) => `<div class="flow-step ${step.label === phaseName ? 'active' : ''}"><strong>${step.label}</strong><span>${step.desc}</span></div>`).join('');
+      return turn.phases.map((phase) => `
+        <div class="flow-step ${phase === phaseName ? 'active' : ''}">
+          <strong>${phase}</strong>
+          <span>${phase === '講習期準備' ? `${turn.prep}回実行` : '実行中の画面'}</span>
+        </div>
+      `).join('');
+    }
+
+    function openOverlay(selector, trigger) {
+      const overlay = document.querySelector(selector);
+      overlay.classList.add('open');
+      overlay.setAttribute('aria-hidden', 'false');
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeOverlay(selector) {
+      const overlay = document.querySelector(selector);
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden', 'true');
+      if (selector === '#phaseOverlay') {
+        document.getElementById('summaryToggle').setAttribute('aria-expanded', 'false');
+      }
+      if (selector === '#menuOverlay') {
+        document.getElementById('menuToggle').setAttribute('aria-expanded', 'false');
+      }
     }
 
     function render() {
       const turn = turns[state.turn];
       const phaseName = turn.phases[state.phase];
       const info = phaseInfo(turn, phaseName);
+
       document.getElementById('periodPill').textContent = turn.period;
       document.getElementById('turnPill').textContent = turn.name;
       document.getElementById('phasePill').textContent = phaseName;
@@ -880,15 +1108,17 @@
       document.getElementById('phaseName').textContent = info.title;
       document.getElementById('phaseDescription').textContent = info.desc;
       document.getElementById('mainPanelTitle').textContent = `${turn.name} / ${phaseName}`;
-      document.getElementById('flowLine').innerHTML = renderFlow(turn, phaseName);
       document.getElementById('mockContent').innerHTML = renderMock(turn, phaseName);
+      document.getElementById('flowLine').innerHTML = renderFlow(turn, phaseName);
       document.getElementById('deckColumns').innerHTML = renderDecks(state.turn, phaseName);
-      document.getElementById('checkpoints').innerHTML = info.checkpoints.map((item) => `<li>${item}</li>`).join('');
+      document.getElementById('scheduleList').innerHTML = renderSchedule();
+      document.getElementById('checkpoints').innerHTML = info.checkpoints.map((item) => `<div class="check-item">${item}</div>`).join('');
       document.getElementById('log').innerHTML = [
         `${turn.name}: ${phaseName}を表示`,
-        turn.period === '通常期' ? `${turn.pool}研修プールを参照` : 'スタッフ別講習デッキを公開',
-        phaseName === '結果' ? 'ゲーム終了処理へ' : '次フェーズへ進行可能'
+        turn.period === '通常期' ? `${turn.pool}研修プールを参照` : 'スタッフ別講習デッキを参照',
+        phaseName === '研修' ? '四択ボタンを固定表示したまま獲得演出を再生' : '次のフェーズへ進行可能'
       ].map((line) => `<div class="log-line">${line}</div>`).join('');
+
       document.getElementById('mExp').textContent = state.turn < 4 ? state.turn * 3 : 12;
       document.getElementById('mEnroll').textContent = state.turn < 4 ? state.turn : 8 + state.turn;
       document.getElementById('mSat').textContent = 3 + Math.min(state.turn, 8);
@@ -955,10 +1185,14 @@
 
     document.getElementById('nextButton').addEventListener('click', () => move(1));
     document.getElementById('prevButton').addEventListener('click', () => move(-1));
-    document.querySelectorAll('.mode-toggle button').forEach((button) => {
-      button.addEventListener('click', () => {
-        document.querySelectorAll('.mode-toggle button').forEach((item) => item.classList.remove('active'));
-        button.classList.add('active');
+    document.getElementById('summaryToggle').addEventListener('click', () => openOverlay('#phaseOverlay', document.getElementById('summaryToggle')));
+    document.getElementById('menuToggle').addEventListener('click', () => openOverlay('#menuOverlay', document.getElementById('menuToggle')));
+    document.querySelectorAll('[data-close]').forEach((button) => {
+      button.addEventListener('click', () => closeOverlay(button.dataset.close));
+    });
+    document.querySelectorAll('.overlay').forEach((overlay) => {
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) closeOverlay(`#${overlay.id}`);
       });
     });
 
