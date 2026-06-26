@@ -155,9 +155,21 @@ export function readCondition(card, stats) {
   });
 }
 
-export function applyEffectText(card, stats) {
+const SUMMER_TOKEN_RULES = [
+  { keyword: '情熱', token: 'passion', delta: 1, label: '情熱' },
+  { keyword: '発想', token: 'inspiration', delta: 1, label: '発想' },
+  { keyword: '整理', token: 'organize', delta: 1, label: '整理' },
+  { keyword: '疲労', token: 'passion', delta: -1, label: '疲労', min: 0 },
+];
+const SUMMER_TOKEN_RULE_MAP = new Map(SUMMER_TOKEN_RULES.map((rule) => [rule.keyword, rule]));
+
+export function applyEffectText(card, stats, options = {}) {
   const result = { ...stats };
   const details = [];
+  const tokenDetails = [];
+  const tokenState = options.difficulty === 'pro' && options.tokens
+    ? { ...options.tokens }
+    : null;
   const body = String(card?.effect ?? '').replace(/【[^】]+】/g, '');
   const segments = body.split(/[。．]/).map((part) => part.trim()).filter(Boolean);
 
@@ -192,9 +204,31 @@ export function applyEffectText(card, stats) {
       result[key] += delta;
       details.push({ key, delta, label });
     }
+
+    if (!tokenState) {
+      continue;
+    }
+
+    for (const match of segment.matchAll(/情熱|発想|整理|疲労/g)) {
+      const rule = SUMMER_TOKEN_RULE_MAP.get(match[0]);
+      if (!rule) {
+        continue;
+      }
+      const before = tokenState[rule.token] ?? 0;
+      const nextValue = Math.max(rule.min ?? Number.NEGATIVE_INFINITY, before + rule.delta);
+      if (nextValue === before) {
+        continue;
+      }
+      tokenState[rule.token] = nextValue;
+      tokenDetails.push({
+        source: rule.label,
+        token: rule.token,
+        delta: nextValue - before,
+      });
+    }
   }
 
-  return { stats: result, details };
+  return { stats: result, details, tokens: tokenState ?? undefined, tokenDetails };
 }
 
 export function getStaffKeysForCard(card) {

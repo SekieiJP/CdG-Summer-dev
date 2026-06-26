@@ -21,6 +21,11 @@ import {
 const NORMAL_STAFF_ORDER = [...NORMAL_STAFF_KEYS];
 const SUMMER_STAFF_ORDER = [...SUMMER_STAFF_KEYS];
 const RARITY_ORDER = { N: 0, R: 1, SR: 2, SSR: 3 };
+const SUMMER_TOKEN_LABELS = {
+  passion: '情熱',
+  inspiration: '発想',
+  organize: '整理',
+};
 
 function createMap(keys, factory) {
   return Object.fromEntries(keys.map((key) => [key, factory(key)]));
@@ -94,6 +99,9 @@ export class SummerGameApp {
       phase: 'training',
       trainingDrawsLeft: 4,
       currentPoolType: TURN_CONFIG[0].poolType,
+      tokens: difficulty === 'pro'
+        ? { passion: 3, inspiration: 0, organize: 0 }
+        : null,
       summerPrepCompleted: 0,
       summerPrepTotal: 0,
       hand: [],
@@ -163,6 +171,7 @@ export class SummerGameApp {
       'rankInfoEnrollment',
       'rankInfoSatisfaction',
       'rankInfoAccounting',
+      'tokenDisplay',
       'trainingArea',
       'actionArea',
       'meetingArea',
@@ -312,6 +321,9 @@ export class SummerGameApp {
       this.state.difficulty = difficulty;
       this.state.stats = { ...config.initialStats, ...this.state.stats };
       this.state.currentPoolType = TURN_CONFIG[this.state.turnIndex]?.poolType ?? '地域';
+      this.state.tokens = difficulty === 'pro'
+        ? (this.state.tokens ?? { passion: 3, inspiration: 0, organize: 0 })
+        : null;
     }
 
     this.elements.activeDifficultyLabel.textContent = config.label;
@@ -554,6 +566,7 @@ export class SummerGameApp {
     const usedStaff = new Set();
     const statsBefore = { ...this.state.stats };
     let nextStats = { ...this.state.stats };
+    let nextTokens = this.state.tokens ? { ...this.state.tokens } : this.state.tokens;
     const validAssignments = {};
 
     for (const [indexText, staffKey] of Object.entries(this.state.assignments)) {
@@ -577,8 +590,9 @@ export class SummerGameApp {
         return;
       }
       usedStaff.add(staffKey);
-      const applied = this.applyCard(card, staffKey, nextStats, '通常期');
+      const applied = this.applyCard(card, staffKey, nextStats, '通常期', nextTokens);
       nextStats = applied.stats;
+      nextTokens = applied.tokens;
       resolution.push({
         type: 'assigned',
         card,
@@ -595,13 +609,15 @@ export class SummerGameApp {
         continue;
       }
       const card = this.nPool.shift();
-      const applied = this.applyCard(card, staffKey, nextStats, '通常期');
+      const applied = this.applyCard(card, staffKey, nextStats, '通常期', nextTokens);
       nextStats = applied.stats;
+      nextTokens = applied.tokens;
       nUsed.push({ card, staffKey, details: applied.details });
       resolution.push({ type: 'n-assigned', card, staffKey, details: applied.details });
     }
 
     this.state.stats = nextStats;
+    this.state.tokens = nextTokens;
     const discarded = this.state.hand
       .map((card, index) => ({ card, staffKey: this.state.assignments[index] ?? null, handIndex: index }))
       .filter((entry) => !entry.staffKey);
@@ -785,6 +801,7 @@ export class SummerGameApp {
 
     const statsBefore = { ...this.state.stats };
     let nextStats = { ...this.state.stats };
+    let nextTokens = this.state.tokens ? { ...this.state.tokens } : this.state.tokens;
     const resolution = [];
     const usedCards = [];
     const restMap = createMap(SUMMER_STAFF_ORDER, () => false);
@@ -798,8 +815,9 @@ export class SummerGameApp {
       }
 
       restMap[staffKey] = true;
-      const applied = this.applyCard(card, staffKey, nextStats, '講習期');
+      const applied = this.applyCard(card, staffKey, nextStats, '講習期', nextTokens);
       nextStats = applied.stats;
+      nextTokens = applied.tokens;
       usedCards.push({ staffKey, card, details: applied.details });
       resolution.push({ type: 'summer-used', staffKey, card, details: applied.details });
       if (card.rarity === 'SR' || card.rarity === 'SSR') {
@@ -808,6 +826,7 @@ export class SummerGameApp {
     }
 
     this.state.stats = nextStats;
+    this.state.tokens = nextTokens;
     this.state.staffRestActivity = restMap;
     const revivedCards = this.applySummerRevival();
 
@@ -861,10 +880,24 @@ export class SummerGameApp {
     return revivedCards;
   }
 
-  applyCard(card, staffKey, stats, seasonLabel) {
+  applyCard(card, staffKey, stats, seasonLabel, tokens = null) {
     let nextStats = { ...stats };
-    const { stats: appliedStats, details } = applyEffectText(card, nextStats);
+    const tokenState = tokens ? { ...tokens } : tokens;
+    const {
+      stats: appliedStats,
+      details,
+      tokens: appliedTokens,
+      tokenDetails,
+    } = applyEffectText(card, nextStats, {
+      difficulty: this.state.difficulty,
+      tokens: tokenState,
+    });
     nextStats = appliedStats;
+    const nextTokens = appliedTokens ?? tokenState;
+
+    for (const detail of tokenDetails ?? []) {
+      this.log(`${detail.source}発動: ${SUMMER_TOKEN_LABELS[detail.token] ?? detail.token}${formatDelta(detail.delta)}`);
+    }
 
     if (seasonLabel === '通常期') {
       if (card.category === '動員') {
@@ -886,7 +919,7 @@ export class SummerGameApp {
       }
     }
 
-    return { stats: nextStats, details };
+    return { stats: nextStats, details, tokens: nextTokens, tokenDetails };
   }
 
   commitMeetingPhase() {
@@ -945,6 +978,7 @@ export class SummerGameApp {
     this.renderDifficultyButtons();
     this.renderTurnPill();
     this.renderStatus();
+    this.renderTokenDisplay();
     this.renderPhaseAreas();
     this.renderTurnTimeline();
     this.renderMenu();
@@ -1001,6 +1035,27 @@ export class SummerGameApp {
       }
       this.renderRankCard(key);
     }
+  }
+
+  renderTokenDisplay() {
+    if (!this.elements.tokenDisplay) {
+      return;
+    }
+    const tokens = this.state.tokens;
+    const visible = this.state.difficulty === 'pro' && !!tokens;
+    this.elements.tokenDisplay.classList.toggle('hidden', !visible);
+    if (!visible) {
+      this.elements.tokenDisplay.innerHTML = '';
+      return;
+    }
+
+    this.elements.tokenDisplay.innerHTML = [
+      { key: 'passion', label: '情熱', className: 'token-passion' },
+      { key: 'inspiration', label: '発想', className: 'token-inspiration' },
+      { key: 'organize', label: '整理', className: 'token-organize' },
+    ].map((entry) => `
+      <span class="token-chip ${entry.className}">${entry.label} ${tokens[entry.key] ?? 0}</span>
+    `).join('');
   }
 
   renderRankCard(statKey) {
