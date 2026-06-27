@@ -105,8 +105,15 @@ async function setupGame(page, config) {
       }
     }
 
-    app.pendingMeeting = null;
-    app.pendingSummerPrep = null;
+    app.pendingMeeting = payload.pendingMeeting ?? null;
+    app.pendingSummerPrep = payload.pendingSummerPrep ?? null;
+    app.pendingSummerInspiration = payload.pendingSummerInspiration ?? null;
+    if (Object.prototype.hasOwnProperty.call(payload, 'summerMeetingSelectionId')) {
+      app.state.summerMeetingSelectionId = payload.summerMeetingSelectionId;
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'summerMeetingInspirationSelectionId')) {
+      app.state.summerMeetingInspirationSelectionId = payload.summerMeetingInspirationSelectionId;
+    }
     app.render();
   }, config);
 }
@@ -401,6 +408,139 @@ test('講習期会議で情熱3のSSR復活を実行できる', async ({ page })
 
   await page.locator('#summerMeetingConfirm').click();
   await expect(page.locator('#turnPill')).toContainText('第7ターン');
+});
+
+test('講習期会議で発想1の追加獲得を実行できる', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'pro',
+    tokens: { passion: 3, inspiration: 1, organize: 0 },
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    pendingMeeting: {
+      kind: 'summer',
+      usedCards: [],
+      statsBefore: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      statsAfter: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      revivedCards: [],
+      resolution: [],
+    },
+    staffDecks: {
+      leader: ['問合対応の基本'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    trainingPools: {
+      地域: {
+        動員: ['チラシ折り', '元塾生に講習案内', '兄弟紹介'],
+      },
+    },
+    trainingDiscards: {
+      地域: {
+        動員: [],
+      },
+    },
+  });
+
+  await expect(page.locator('#summerMeetingInspirationPanel')).toBeVisible();
+  await page.locator('#summerMeetingInspirationChoices [data-summer-meeting-pool="地域"][data-summer-meeting-category="動員"]').click();
+  await expect(page.locator('#summerMeetingInspirationCandidateArea .summer-card-button')).toHaveCount(3);
+  await page.locator('#summerMeetingInspirationCandidateArea .summer-card-button').first().click();
+  await page.locator('#summerDeckGrid [data-summer-meeting-target-staff="leader"]').click();
+
+  await expect(page.locator('#tokenDisplay')).toContainText('発想 0');
+  await expect(page.locator('#summerMeetingSummary')).toContainText('チラシ折り');
+  await expect(page.locator('#summerDeckGrid')).toContainText('チラシ折り');
+  await expect(page.locator('#logMessages')).toContainText('発想追加: チラシ折り を 室長 デッキに追加 / 発想-1');
+  await page.evaluate(() => {
+    const app = window.__summerGame;
+    const added = app.state.staffDecks.leader.at(-1);
+    if (!added?.instanceId) {
+      throw new Error('added card instanceId missing');
+    }
+  });
+});
+
+test('未選択の2枚は同じ山の捨て札へ戻る', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'pro',
+    tokens: { passion: 3, inspiration: 1, organize: 0 },
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    pendingMeeting: {
+      kind: 'summer',
+      usedCards: [],
+      statsBefore: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      statsAfter: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      revivedCards: [],
+      resolution: [],
+    },
+    staffDecks: {
+      leader: [],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    trainingPools: {
+      地域: {
+        動員: ['チラシ折り', '元塾生に講習案内', '兄弟紹介'],
+      },
+    },
+    trainingDiscards: {
+      地域: {
+        動員: [],
+      },
+    },
+  });
+
+  await page.locator('#summerMeetingInspirationChoices [data-summer-meeting-pool="地域"][data-summer-meeting-category="動員"]').click();
+  await page.locator('#summerMeetingInspirationCandidateArea .summer-card-button').first().click();
+  await page.locator('#summerDeckGrid [data-summer-meeting-target-staff="leader"]').click();
+
+  const discarded = await page.evaluate(() => {
+    const app = window.__summerGame;
+    return app.trainingDiscards.地域.動員.map((card) => card.cardName);
+  });
+  expect(discarded).toEqual(['元塾生に講習案内', '兄弟紹介']);
+});
+
+test('FRESHでは発想追加UIが表示されない', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'fresh',
+    tokens: null,
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    pendingMeeting: {
+      kind: 'summer',
+      usedCards: [],
+      statsBefore: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 3 },
+      statsAfter: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 3 },
+      revivedCards: [],
+      resolution: [],
+    },
+    staffDecks: {
+      leader: ['できるまで居残り！'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    staffFlipped: {
+      leader: ['できるまで居残り！'],
+    },
+  });
+
+  await expect(page.locator('#summerMeetingPanel')).toBeVisible();
+  await expect(page.locator('#summerMeetingInspirationPanel')).toBeHidden();
+  await expect(page.locator('#tokenDisplay')).toBeHidden();
 });
 
 test('FRESHでは情熱復活UIが表示されない', async ({ page }) => {

@@ -87,6 +87,7 @@ export class SummerGameApp {
     this.elements = {};
     this.pendingMeeting = null;
     this.pendingSummerPrep = null;
+    this.pendingSummerInspiration = null;
     this.binded = false;
     this.statusAnimationTimer = null;
   }
@@ -142,6 +143,7 @@ export class SummerGameApp {
       usedTurns: [],
       albaChoiceIndex: null,
       summerMeetingSelectionId: null,
+      summerMeetingInspirationSelectionId: null,
     };
   }
 
@@ -227,6 +229,10 @@ export class SummerGameApp {
       'summerMeetingRevivalStatus',
       'summerMeetingRevivalTargets',
       'summerMeetingRevivalConfirm',
+      'summerMeetingInspirationPanel',
+      'summerMeetingInspirationStatus',
+      'summerMeetingInspirationChoices',
+      'summerMeetingInspirationCandidateArea',
       'summerMeetingConfirm',
       'summerDeckGrid',
     ];
@@ -299,10 +305,31 @@ export class SummerGameApp {
       this.selectSummerMeetingRevivalCandidate(button.dataset.summerRevivalId);
     });
 
+    this.elements.summerMeetingInspirationChoices?.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-summer-meeting-pool]');
+      if (!button) {
+        return;
+      }
+      this.startSummerMeetingInspirationSelection(button.dataset.summerMeetingPool, button.dataset.summerMeetingCategory);
+    });
+
+    this.elements.summerMeetingInspirationCandidateArea?.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-summer-meeting-candidate-id]');
+      if (!button) {
+        return;
+      }
+      this.selectSummerMeetingInspirationCandidate(button.dataset.summerMeetingCandidateId);
+    });
+
     this.elements.summerDeckGrid?.addEventListener('click', (event) => {
       const targetButton = event.target.closest('[data-summer-target]');
       if (targetButton) {
         this.exchangeSummerPrepTarget(targetButton.dataset.summerTargetStaff, Number(targetButton.dataset.summerTargetIndex));
+        return;
+      }
+      const inspirationTargetButton = event.target.closest('[data-summer-meeting-target]');
+      if (inspirationTargetButton) {
+        this.finalizeSummerMeetingInspirationSelection(inspirationTargetButton.dataset.summerMeetingTargetStaff);
         return;
       }
       const useButton = event.target.closest('[data-summer-use]');
@@ -344,8 +371,10 @@ export class SummerGameApp {
     this.elements.previewDifficultyLabel.textContent = config.label;
     this.elements.turnDetailLabel.textContent = config.label;
     this.pendingSummerPrep = null;
+    this.pendingSummerInspiration = null;
     this.summerPrepTotal = 0;
     this.state.summerMeetingSelectionId = null;
+    this.state.summerMeetingInspirationSelectionId = null;
   }
 
   parseRankCsv(csvText) {
@@ -425,7 +454,10 @@ export class SummerGameApp {
     this.state.currentPoolType = turn.poolType;
     this.pendingMeeting = null;
     this.pendingSummerPrep = null;
+    this.pendingSummerInspiration = null;
     this.state.albaChoiceIndex = null;
+    this.state.summerMeetingSelectionId = null;
+    this.state.summerMeetingInspirationSelectionId = null;
 
     if (turn.season === '通常期') {
       this.state.phase = 'training';
@@ -450,6 +482,7 @@ export class SummerGameApp {
       this.state.summerPrepTotal = 0;
       this.state.summerPrepCompleted = 0;
       this.pendingSummerPrep = null;
+      this.pendingSummerInspiration = null;
       this.state.summerActionSelections = this.createEmptySummerActionSelections();
       this.state.staffRestActivity = this.createEmptySummerRestMap();
       return;
@@ -464,7 +497,9 @@ export class SummerGameApp {
     const nextIndex = this.state.turnIndex + 1;
     this.pendingMeeting = null;
     this.pendingSummerPrep = null;
+    this.pendingSummerInspiration = null;
     this.state.summerMeetingSelectionId = null;
+    this.state.summerMeetingInspirationSelectionId = null;
     if (nextIndex >= TURN_CONFIG.length) {
       this.state.phase = 'result';
       this.render();
@@ -510,6 +545,45 @@ export class SummerGameApp {
         break;
       }
       candidates.push(cloneCardWithId(card, 'prep'));
+    }
+    return candidates;
+  }
+
+  getTrainingPoolAvailableCount(poolType, category) {
+    const deck = this.trainingPools?.[poolType]?.[category] ?? [];
+    const discard = this.trainingDiscards?.[poolType]?.[category] ?? [];
+    return deck.length + discard.length;
+  }
+
+  drawSummerMeetingInspirationCandidates(poolType, category) {
+    const deck = this.trainingPools?.[poolType]?.[category] ?? [];
+    const discard = this.trainingDiscards?.[poolType]?.[category] ?? [];
+    const total = deck.length + discard.length;
+    if (total < 3) {
+      return null;
+    }
+
+    let refillCards = [];
+    if (deck.length < 3 && discard.length > 0) {
+      refillCards = shuffle(discard);
+    }
+
+    if (deck.length + refillCards.length < 3) {
+      return null;
+    }
+
+    if (deck.length < 3 && refillCards.length > 0) {
+      deck.push(...refillCards);
+      discard.length = 0;
+    }
+
+    const candidates = [];
+    for (let i = 0; i < 3; i += 1) {
+      const card = deck.shift();
+      if (!card) {
+        return null;
+      }
+      candidates.push(cloneCardWithId(card, 'meeting-inspiration'));
     }
     return candidates;
   }
@@ -687,6 +761,36 @@ export class SummerGameApp {
     this.render();
   }
 
+  startSummerMeetingInspirationSelection(poolType, category) {
+    if (this.state.difficulty !== 'pro' || this.state.phase !== 'summer-meeting' || this.pendingMeeting?.kind !== 'summer') {
+      return;
+    }
+    if (this.pendingSummerInspiration) {
+      this.log('先に選択中の発想カードを確定してください', 'error');
+      return;
+    }
+    if (!['地域', '全校'].includes(poolType) || !TRAINING_CATEGORIES.includes(category)) {
+      return;
+    }
+    if ((this.state.tokens?.inspiration ?? 0) <= 0) {
+      this.log('発想が足りません', 'error');
+      return;
+    }
+    const candidates = this.drawSummerMeetingInspirationCandidates(poolType, category);
+    if (!candidates) {
+      this.log(`${poolType} ${category} の候補が足りません`, 'error');
+      return;
+    }
+    this.pendingSummerInspiration = {
+      poolType,
+      category,
+      candidates,
+      selectedCandidateId: null,
+    };
+    this.state.summerMeetingInspirationSelectionId = null;
+    this.render();
+  }
+
   selectSummerPrepCandidate(candidateId) {
     if (this.state.phase !== 'summer-prep' || !this.pendingSummerPrep) {
       return;
@@ -855,6 +959,8 @@ export class SummerGameApp {
       resolution,
     };
     this.state.summerMeetingSelectionId = null;
+    this.pendingSummerInspiration = null;
+    this.state.summerMeetingInspirationSelectionId = null;
     this.state.phase = 'summer-meeting';
     this.showStatusAnimation([...resolution, ...revivedCards.map((item) => ({ type: 'summer-revival', ...item }))]);
     this.log('講習期の教室行動を確定しました');
@@ -945,6 +1051,10 @@ export class SummerGameApp {
     }
 
     if (this.pendingMeeting.kind === 'summer') {
+      if (this.pendingSummerInspiration) {
+        this.log('発想追加を先に確定してください', 'error');
+        return;
+      }
       this.state.usedTurns.push({
         turn: this.currentTurnConfig().turn,
         stats: { ...this.state.stats },
@@ -1337,6 +1447,9 @@ export class SummerGameApp {
       if (this.elements.summerCandidateArea) {
         this.elements.summerCandidateArea.innerHTML = '';
       }
+      if (this.elements.summerMeetingInspirationPanel) {
+        this.elements.summerMeetingInspirationPanel.classList.add('hidden');
+      }
       return;
     }
 
@@ -1369,6 +1482,7 @@ export class SummerGameApp {
     this.renderSummerDeckGrid();
     this.renderSummerMeetingSummary();
     this.renderSummerMeetingRevivalPanel();
+    this.renderSummerMeetingInspirationPanel();
     this.updateSummerActionConfirmState();
   }
 
@@ -1524,6 +1638,13 @@ export class SummerGameApp {
               `;
             }).join('') : '<div class="meeting-summary-item">カードなし</div>'}
           </div>
+          ${mode === 'summer-meeting' ? `
+            <div class="summer-deck-actions">
+              <button type="button" class="summer-rest-button ${this.pendingSummerInspiration?.selectedCandidateId && (this.state.tokens?.inspiration ?? 0) > 0 ? '' : 'active'}" data-summer-meeting-target data-summer-meeting-target-staff="${staffKey}" ${(this.pendingSummerInspiration?.selectedCandidateId && (this.state.tokens?.inspiration ?? 0) > 0) ? '' : 'disabled'}>
+                このデッキへ追加
+              </button>
+            </div>
+          ` : ''}
           ${mode === 'summer-action' ? `<div class="summer-deck-actions"><button type="button" class="summer-rest-button ${this.state.summerActionSelections[staffKey] === null ? 'active' : ''}" data-summer-rest="${staffKey}">休む</button></div>` : ''}
         </article>
       `;
@@ -1542,10 +1663,74 @@ export class SummerGameApp {
     const used = this.pendingMeeting.usedCards.map((item) => `${this.getStaffLabel(item.staffKey)}: ${item.card.cardName}`).join(' / ') || 'なし';
     const rested = SUMMER_STAFF_ORDER.filter((staffKey) => !this.state.staffRestActivity[staffKey]).map((staffKey) => this.getStaffLabel(staffKey)).join(' / ') || 'なし';
     const revived = this.pendingMeeting.revivedCards.map((item) => `${this.getStaffLabel(item.staffKey)}: ${item.card.cardName}`).join(' / ') || 'なし';
+    const added = this.pendingMeeting.inspirationAcquiredCards?.map((item) => `${this.getStaffLabel(item.staffKey)}: ${item.card.cardName}`).join(' / ') || 'なし';
     this.elements.summerMeetingSummary.innerHTML = `
       <div class="meeting-summary-item">使用: ${used}</div>
       <div class="meeting-summary-item">休憩: ${rested}</div>
       <div class="meeting-summary-item">復活: ${revived}</div>
+      <div class="meeting-summary-item">追加: ${added}</div>
+    `;
+  }
+
+  renderSummerMeetingInspirationPanel() {
+    if (!this.elements.summerMeetingInspirationPanel || !this.elements.summerMeetingInspirationStatus || !this.elements.summerMeetingInspirationChoices || !this.elements.summerMeetingInspirationCandidateArea) {
+      return;
+    }
+
+    const visible = this.state.phase === 'summer-meeting' && this.pendingMeeting?.kind === 'summer' && this.state.difficulty === 'pro' && !!this.state.tokens;
+    this.elements.summerMeetingInspirationPanel.classList.toggle('hidden', !visible);
+    if (!visible) {
+      this.elements.summerMeetingInspirationStatus.innerHTML = '';
+      this.elements.summerMeetingInspirationChoices.innerHTML = '';
+      this.elements.summerMeetingInspirationCandidateArea.innerHTML = '';
+      return;
+    }
+
+    const inspiration = this.state.tokens?.inspiration ?? 0;
+    const selected = this.pendingSummerInspiration;
+    const selectedId = selected?.selectedCandidateId ?? null;
+
+    this.elements.summerMeetingInspirationStatus.innerHTML = [
+      `<div class="meeting-summary-item">残り発想: ${inspiration}</div>`,
+      `<div class="meeting-summary-item">選択山札: ${selected ? `${selected.poolType} / ${selected.category}` : '未選択'}</div>`,
+      `<div class="meeting-summary-item">候補数: ${selected ? selected.candidates.length : 0}</div>`,
+    ].join('');
+
+    this.elements.summerMeetingInspirationChoices.innerHTML = ['地域', '全校'].flatMap((poolType) => (
+      TRAINING_CATEGORIES.map((category) => {
+        const count = this.getTrainingPoolAvailableCount(poolType, category);
+        const disabled = inspiration < 1 || count < 3 || !!this.pendingSummerInspiration;
+        return `
+          <button type="button" class="choice-button category-${category} ${disabled ? 'disabled' : ''}" data-summer-meeting-pool="${poolType}" data-summer-meeting-category="${category}" ${disabled ? 'disabled' : ''}>
+            <span class="choice-label">${poolType} ${category}</span>
+            <span class="choice-count">${count}枚</span>
+          </button>
+        `;
+      })
+    )).join('');
+
+    if (!selected) {
+      this.elements.summerMeetingInspirationCandidateArea.innerHTML = '<div class="meeting-summary-item">山札を1つ選んでください。</div>';
+      return;
+    }
+
+    this.elements.summerMeetingInspirationCandidateArea.innerHTML = `
+      <div class="meeting-summary-item">選択中: ${selected.poolType} / ${selected.category}</div>
+      <div class="summer-candidate-grid">
+        ${selected.candidates.map((card) => `
+          <button type="button" class="summer-card-button ${selectedId === card.instanceId ? 'selected' : ''}" data-summer-meeting-candidate-id="${card.instanceId}">
+            <div class="summer-card-top">
+              <span class="summer-card-name">${card.cardName}</span>
+              <span class="card-rarity rarity-${card.rarity}">${card.rarity}</span>
+            </div>
+            <div class="summer-card-meta">
+              <span class="card-category-text category-${card.category}">${card.category}</span>
+              <span class="summer-card-desc">${textToHtml(card.topEffect || card.effect)}</span>
+            </div>
+          </button>
+        `).join('')}
+      </div>
+      <div class="meeting-summary-item">追加先はデッキ下部のボタンで選びます。</div>
     `;
   }
 
@@ -1598,6 +1783,72 @@ export class SummerGameApp {
     }
     this.state.summerMeetingSelectionId = instanceId;
     this.renderSummerMeetingRevivalPanel();
+  }
+
+  selectSummerMeetingInspirationCandidate(instanceId) {
+    if (!this.pendingSummerInspiration) {
+      return;
+    }
+    if (!this.pendingSummerInspiration.candidates.some((card) => card.instanceId === instanceId)) {
+      return;
+    }
+    this.pendingSummerInspiration.selectedCandidateId = instanceId;
+    this.state.summerMeetingInspirationSelectionId = instanceId;
+    this.renderSummerMeetingInspirationPanel();
+    this.renderSummerDeckGrid();
+  }
+
+  finalizeSummerMeetingInspirationSelection(staffKey) {
+    if (this.state.difficulty !== 'pro' || this.state.phase !== 'summer-meeting' || this.pendingMeeting?.kind !== 'summer') {
+      return;
+    }
+    if (!this.pendingSummerInspiration) {
+      return;
+    }
+    if (!SUMMER_STAFF_ORDER.includes(staffKey)) {
+      return;
+    }
+    const candidate = this.pendingSummerInspiration.candidates.find((card) => card.instanceId === this.pendingSummerInspiration.selectedCandidateId);
+    if (!candidate) {
+      this.log('発想追加の対象を選んでください', 'error');
+      return;
+    }
+
+    const tokens = this.state.tokens;
+    if (!tokens || (tokens.inspiration ?? 0) < 1) {
+      this.log('発想が足りません', 'error');
+      return;
+    }
+
+    const targetDeck = this.state.staffDecks[staffKey];
+    if (!Array.isArray(targetDeck)) {
+      return;
+    }
+
+    const discardBucket = this.trainingDiscards[this.pendingSummerInspiration.poolType][this.pendingSummerInspiration.category];
+    const rejected = this.pendingSummerInspiration.candidates.filter((card) => card.instanceId !== candidate.instanceId);
+    discardBucket.push(...rejected.map((card) => ({ ...card })));
+
+    const addedCard = cloneCardWithId(candidate, staffKey);
+    targetDeck.push(addedCard);
+    this.state.tokens = {
+      ...tokens,
+      inspiration: (tokens.inspiration ?? 0) - 1,
+    };
+    this.pendingMeeting.inspirationAcquiredCards = this.pendingMeeting.inspirationAcquiredCards ?? [];
+    this.pendingMeeting.inspirationAcquiredCards.push({
+      type: 'summer-inspiration-add',
+      staffKey,
+      poolType: this.pendingSummerInspiration.poolType,
+      category: this.pendingSummerInspiration.category,
+      card: addedCard,
+      sourceCard: candidate,
+      discarded: rejected,
+    });
+    this.log(`発想追加: ${candidate.cardName} を ${this.getStaffLabel(staffKey)} デッキに追加 / 発想-1`);
+    this.pendingSummerInspiration = null;
+    this.state.summerMeetingInspirationSelectionId = null;
+    this.render();
   }
 
   useSummerMeetingPassionRevival() {
