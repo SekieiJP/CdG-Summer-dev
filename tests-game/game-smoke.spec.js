@@ -518,6 +518,152 @@ test('未選択の2枚は同じ山の捨て札へ戻る', async ({ page }) => {
   expect(discarded).toEqual(['元塾生に講習案内', '兄弟紹介']);
 });
 
+test('通常期の保存状態はリロード後も手札と山札順を復帰する', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    turnIndex: 0,
+    phase: 'training',
+    trainingDrawsLeft: 4,
+    trainingPools: {
+      地域: {
+        動員: ['チラシ折り', '元塾生に講習案内', '校門前ビラ配り', '心を掴む1日見学'],
+      },
+    },
+    trainingDiscards: {
+      地域: {
+        動員: [],
+      },
+    },
+  });
+
+  await page.locator('#trainingChoices [data-category="動員"]').click();
+  await page.locator('#trainingChoices [data-category="動員"]').click();
+  await expect(page.locator('#handGrid')).toContainText('チラシ折り');
+  await expect(page.locator('#handGrid')).toContainText('元塾生に講習案内');
+
+  await page.reload();
+  await expect(page.locator('#startOverlay')).toBeHidden();
+  await expect(page.locator('#trainingArea')).toBeVisible();
+  await expect(page.locator('#handGrid')).toContainText('チラシ折り');
+  await expect(page.locator('#handGrid')).toContainText('元塾生に講習案内');
+
+  await page.locator('#trainingChoices [data-category="動員"]').click();
+  await expect(page.locator('#handGrid')).toContainText('校門前ビラ配り');
+  expect(pageErrors).toEqual([]);
+});
+
+test('講習期会議途中の保存状態はSetと候補山札順を復帰する', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'pro',
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    tokens: { passion: 3, inspiration: 1, organize: 0 },
+    pendingMeeting: {
+      kind: 'summer',
+      usedCards: [],
+      statsBefore: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      statsAfter: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      revivedCards: [],
+      resolution: [],
+    },
+    staffDecks: {
+      leader: ['できるまで居残り！'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    staffFlipped: {
+      leader: ['できるまで居残り！'],
+    },
+    trainingPools: {
+      地域: {
+        動員: ['チラシ折り', '元塾生に講習案内', '兄弟紹介'],
+      },
+    },
+    trainingDiscards: {
+      地域: {
+        動員: [],
+      },
+    },
+  });
+
+  await page.locator('#summerMeetingInspirationChoices [data-summer-meeting-pool="地域"][data-summer-meeting-category="動員"]').click();
+  await page.locator('#summerMeetingInspirationCandidateArea .summer-card-button').first().click();
+
+  const beforeReload = await page.evaluate(() => {
+    const app = window.__summerGame;
+    return {
+      flipped: app.state.staffFlipped.leader.has(app.state.staffDecks.leader[0].instanceId),
+      candidates: app.pendingSummerInspiration.candidates.map((card) => card.cardName),
+    };
+  });
+  expect(beforeReload.flipped).toBe(true);
+  expect(beforeReload.candidates).toEqual(['チラシ折り', '元塾生に講習案内', '兄弟紹介']);
+
+  await page.reload();
+  await expect(page.locator('#summerArea')).toBeVisible();
+  await expect(page.locator('#summerMeetingPanel')).toBeVisible();
+  await expect(page.locator('#summerMeetingInspirationPanel')).toBeVisible();
+  await expect(page.locator('#summerMeetingInspirationCandidateArea .summer-card-button')).toHaveCount(3);
+  await expect(page.locator('#summerDeckGrid')).toContainText('裏返し');
+
+  const afterReload = await page.evaluate(() => {
+    const app = window.__summerGame;
+    return {
+      flipped: app.state.staffFlipped.leader.has(app.state.staffDecks.leader[0].instanceId),
+      candidates: app.pendingSummerInspiration?.candidates.map((card) => card.cardName) ?? [],
+      selected: app.pendingSummerInspiration?.selectedCandidateId ?? null,
+    };
+  });
+  expect(afterReload.flipped).toBe(true);
+  expect(afterReload.candidates).toEqual(['チラシ折り', '元塾生に講習案内', '兄弟紹介']);
+  expect(afterReload.selected).not.toBeNull();
+  expect(pageErrors).toEqual([]);
+});
+
+test('不正JSONや旧形式の保存は新規開始へフォールバックする', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await page.goto('/');
+  await expect(page.locator('#startOverlay')).toBeVisible();
+  await expect(page.locator('#previewDifficultyLabel')).toContainText('FRESH');
+
+  await page.evaluate(() => {
+    localStorage.setItem('cdg_summer_state', 'not-json');
+  });
+
+  await page.reload();
+  await expect(page.locator('#startOverlay')).toBeVisible();
+
+  const firstSave = await page.evaluate(() => JSON.parse(localStorage.getItem('cdg_summer_state')));
+  expect(firstSave.version).toBe(1);
+  expect(firstSave.state.difficulty).toBe('fresh');
+
+  await page.evaluate(() => {
+    localStorage.setItem('cdg_summer_state', JSON.stringify({ state: { difficulty: 'pro' } }));
+  });
+
+  await page.reload();
+  await expect(page.locator('#startOverlay')).toBeVisible();
+
+  const secondSave = await page.evaluate(() => JSON.parse(localStorage.getItem('cdg_summer_state')));
+  expect(secondSave.version).toBe(1);
+  expect(secondSave.state.difficulty).toBe('fresh');
+  expect(pageErrors).toEqual([]);
+});
+
 test('講習期会議で整理1を使って通常カードを削除できる', async ({ page }) => {
   await page.goto('/');
   await page.locator('#startGame').click();

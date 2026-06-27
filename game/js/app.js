@@ -26,9 +26,30 @@ const SUMMER_TOKEN_LABELS = {
   inspiration: '発想',
   organize: '整理',
 };
+const SAVE_KEY = 'cdg_summer_state';
+const SAVE_VERSION = 1;
 
 function createMap(keys, factory) {
   return Object.fromEntries(keys.map((key) => [key, factory(key)]));
+}
+
+function cloneJson(value) {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
+function isPlainObject(value) {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function cloneCardList(cards) {
+  return Array.isArray(cards) ? cards.map((card) => cloneJson(card)) : [];
+}
+
+function toStringSet(values) {
+  return new Set(Array.isArray(values) ? values.filter((value) => typeof value === 'string') : []);
 }
 
 function makeInstanceId(prefix = 'card') {
@@ -88,6 +109,7 @@ export class SummerGameApp {
     this.pendingMeeting = null;
     this.pendingSummerPrep = null;
     this.pendingSummerInspiration = null;
+    this.startOverlayHidden = false;
     this.binded = false;
     this.statusAnimationTimer = null;
   }
@@ -151,7 +173,14 @@ export class SummerGameApp {
   async init() {
     this.cacheElements();
     this.bindEvents();
-    await this.loadDifficulty(this.state.difficulty, { preserveState: false });
+    const savedState = this.readSavedGameState();
+    const savedDifficulty = savedState?.state?.difficulty;
+    const difficulty = DIFFICULTY_CONFIG[savedDifficulty] ? savedDifficulty : this.state.difficulty;
+    await this.loadDifficulty(difficulty, { preserveState: false });
+    if (savedState && this.applySavedGameState(savedState)) {
+      this.startOverlayHidden = !!savedState.startOverlayHidden;
+    }
+    this.syncStartOverlay();
     this.render();
   }
 
@@ -384,6 +413,7 @@ export class SummerGameApp {
     this.elements.activeDifficultyLabel.textContent = config.label;
     this.elements.previewDifficultyLabel.textContent = config.label;
     this.elements.turnDetailLabel.textContent = config.label;
+    this.pendingMeeting = null;
     this.pendingSummerPrep = null;
     this.pendingSummerInspiration = null;
     this.summerPrepTotal = 0;
@@ -406,7 +436,181 @@ export class SummerGameApp {
       }));
   }
 
+  syncStartOverlay() {
+    if (this.startOverlayHidden) {
+      this.hideStartOverlay();
+      return;
+    }
+    this.showStartOverlay();
+  }
+
+  showStartOverlay() {
+    document.getElementById('startOverlay')?.classList.remove('hidden');
+  }
+
+  readSavedGameState() {
+    try {
+      const raw = window.localStorage?.getItem(SAVE_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      if (!this.isValidSavedGameState(parsed)) {
+        this.clearSavedGameState();
+        return null;
+      }
+      return parsed;
+    } catch {
+      this.clearSavedGameState();
+      return null;
+    }
+  }
+
+  isValidSavedGameState(payload) {
+    if (!isPlainObject(payload) || payload.version !== SAVE_VERSION || !isPlainObject(payload.state)) {
+      return false;
+    }
+    const { state } = payload;
+    if (!DIFFICULTY_CONFIG[state.difficulty]) {
+      return false;
+    }
+    if (!Number.isInteger(state.turnIndex) || state.turnIndex < 0 || state.turnIndex >= TURN_CONFIG.length) {
+      return false;
+    }
+    if (typeof state.phase !== 'string') {
+      return false;
+    }
+    if (!Number.isInteger(state.trainingDrawsLeft) || !Number.isInteger(state.summerPrepCompleted) || !Number.isInteger(state.summerPrepTotal)) {
+      return false;
+    }
+    if (state.difficulty === 'pro' ? !isPlainObject(state.tokens) : state.tokens !== null) {
+      return false;
+    }
+    if (!Array.isArray(state.hand) || !isPlainObject(state.assignments) || !isPlainObject(state.staffDecks) || !isPlainObject(state.staffFlipped) || !isPlainObject(state.staffRestActivity) || !isPlainObject(state.staffMidRestRecord) || !isPlainObject(state.summerActionSelections) || !Array.isArray(state.log) || !Array.isArray(state.usedTurns)) {
+      return false;
+    }
+    if (!isPlainObject(payload.trainingPools) || !isPlainObject(payload.trainingDiscards) || !Array.isArray(payload.nPool)) {
+      return false;
+    }
+    if (payload.pendingMeeting !== null && !isPlainObject(payload.pendingMeeting)) {
+      return false;
+    }
+    if (payload.pendingSummerPrep !== null && !isPlainObject(payload.pendingSummerPrep)) {
+      return false;
+    }
+    if (payload.pendingSummerInspiration !== null && !isPlainObject(payload.pendingSummerInspiration)) {
+      return false;
+    }
+    return true;
+  }
+
+  applySavedGameState(payload) {
+    if (!this.isValidSavedGameState(payload)) {
+      return false;
+    }
+
+    const { state } = payload;
+    const difficulty = state.difficulty;
+    this.state = this.createInitialState(difficulty);
+    this.state.difficulty = difficulty;
+    this.state.turnIndex = state.turnIndex;
+    this.state.phase = state.phase;
+    this.state.trainingDrawsLeft = Number.isInteger(state.trainingDrawsLeft)
+      ? state.trainingDrawsLeft
+      : this.state.trainingDrawsLeft;
+    this.state.currentPoolType = typeof state.currentPoolType === 'string'
+      ? state.currentPoolType
+      : (TURN_CONFIG[state.turnIndex]?.poolType ?? '地域');
+    this.state.tokens = state.tokens === null ? null : cloneJson(state.tokens);
+    this.state.summerPrepCompleted = Number.isInteger(state.summerPrepCompleted) ? state.summerPrepCompleted : 0;
+    this.state.summerPrepTotal = Number.isInteger(state.summerPrepTotal) ? state.summerPrepTotal : 0;
+    this.state.hand = cloneCardList(state.hand);
+    this.state.assignments = isPlainObject(state.assignments) ? { ...state.assignments } : {};
+    this.state.staffDecks = createMap(SUMMER_STAFF_ORDER, (staffKey) => cloneCardList(state.staffDecks?.[staffKey]));
+    this.state.staffFlipped = createMap(SUMMER_STAFF_ORDER, (staffKey) => toStringSet(state.staffFlipped?.[staffKey]));
+    this.state.staffRestActivity = createMap(SUMMER_STAFF_ORDER, (staffKey) => !!state.staffRestActivity?.[staffKey]);
+    this.state.staffMidRestRecord = createMap(SUMMER_STAFF_ORDER, (staffKey) => {
+      const record = state.staffMidRestRecord?.[staffKey];
+      return {
+        mid1: record?.mid1 ?? null,
+        mid2: record?.mid2 ?? null,
+      };
+    });
+    this.state.summerMeetingOrganizeSelectionId = state.summerMeetingOrganizeSelectionId ?? null;
+    this.state.summerActionSelections = createMap(SUMMER_STAFF_ORDER, (staffKey) => state.summerActionSelections?.[staffKey] ?? null);
+    this.state.stats = isPlainObject(state.stats) ? { ...this.state.stats, ...state.stats } : this.state.stats;
+    this.state.lastDrawId = state.lastDrawId ?? null;
+    this.state.log = Array.isArray(state.log) ? cloneJson(state.log) : [];
+    this.state.usedTurns = Array.isArray(state.usedTurns) ? cloneJson(state.usedTurns) : [];
+    this.state.albaChoiceIndex = state.albaChoiceIndex ?? null;
+    this.state.summerMeetingSelectionId = state.summerMeetingSelectionId ?? null;
+    this.state.summerMeetingInspirationSelectionId = state.summerMeetingInspirationSelectionId ?? null;
+    this.trainingPools = createMap(['地域', '全校'], (poolType) => createMap(TRAINING_CATEGORIES, (category) => cloneCardList(payload.trainingPools?.[poolType]?.[category])));
+    this.trainingDiscards = createMap(['地域', '全校'], (poolType) => createMap(TRAINING_CATEGORIES, (category) => cloneCardList(payload.trainingDiscards?.[poolType]?.[category])));
+    this.nPool = cloneCardList(payload.nPool);
+    this.pendingMeeting = payload.pendingMeeting ? cloneJson(payload.pendingMeeting) : null;
+    this.pendingSummerPrep = payload.pendingSummerPrep ? cloneJson(payload.pendingSummerPrep) : null;
+    this.pendingSummerInspiration = payload.pendingSummerInspiration ? cloneJson(payload.pendingSummerInspiration) : null;
+    this.startOverlayHidden = !!payload.startOverlayHidden;
+    return true;
+  }
+
+  buildSavedGameState() {
+    return {
+      version: SAVE_VERSION,
+      startOverlayHidden: this.startOverlayHidden,
+      state: {
+        difficulty: this.state.difficulty,
+        turnIndex: this.state.turnIndex,
+        phase: this.state.phase,
+        trainingDrawsLeft: this.state.trainingDrawsLeft,
+        currentPoolType: this.state.currentPoolType,
+        tokens: cloneJson(this.state.tokens),
+        summerPrepCompleted: this.state.summerPrepCompleted,
+        summerPrepTotal: this.state.summerPrepTotal,
+        hand: cloneCardList(this.state.hand),
+        assignments: cloneJson(this.state.assignments),
+        staffDecks: createMap(SUMMER_STAFF_ORDER, (staffKey) => cloneCardList(this.state.staffDecks?.[staffKey])),
+        staffFlipped: createMap(SUMMER_STAFF_ORDER, (staffKey) => [...(this.state.staffFlipped?.[staffKey] ?? new Set())]),
+        staffRestActivity: cloneJson(this.state.staffRestActivity),
+        staffMidRestRecord: cloneJson(this.state.staffMidRestRecord),
+        summerMeetingOrganizeSelectionId: this.state.summerMeetingOrganizeSelectionId,
+        summerActionSelections: cloneJson(this.state.summerActionSelections),
+        stats: cloneJson(this.state.stats),
+        lastDrawId: this.state.lastDrawId,
+        log: cloneJson(this.state.log),
+        usedTurns: cloneJson(this.state.usedTurns),
+        albaChoiceIndex: this.state.albaChoiceIndex,
+        summerMeetingSelectionId: this.state.summerMeetingSelectionId,
+        summerMeetingInspirationSelectionId: this.state.summerMeetingInspirationSelectionId,
+      },
+      trainingPools: createMap(['地域', '全校'], (poolType) => createMap(TRAINING_CATEGORIES, (category) => cloneCardList(this.trainingPools?.[poolType]?.[category]))),
+      trainingDiscards: createMap(['地域', '全校'], (poolType) => createMap(TRAINING_CATEGORIES, (category) => cloneCardList(this.trainingDiscards?.[poolType]?.[category]))),
+      nPool: cloneCardList(this.nPool),
+      pendingMeeting: this.pendingMeeting ? cloneJson(this.pendingMeeting) : null,
+      pendingSummerPrep: this.pendingSummerPrep ? cloneJson(this.pendingSummerPrep) : null,
+      pendingSummerInspiration: this.pendingSummerInspiration ? cloneJson(this.pendingSummerInspiration) : null,
+    };
+  }
+
+  persistGameState() {
+    try {
+      window.localStorage?.setItem(SAVE_KEY, JSON.stringify(this.buildSavedGameState()));
+    } catch {
+      // 保存不能でもゲーム継続を優先する。
+    }
+  }
+
+  clearSavedGameState() {
+    try {
+      window.localStorage?.removeItem(SAVE_KEY);
+    } catch {
+      // 破損した保存は無視する。
+    }
+  }
+
   startGame() {
+    this.startOverlayHidden = true;
     this.hideStartOverlay();
     this.render();
     this.log('ゲームを開始しました');
@@ -642,8 +846,7 @@ export class SummerGameApp {
       return;
     }
     this.state.assignments[handIndex] = staffKey;
-    this.renderHandGrid();
-    this.updateActionConfirmState();
+    this.render();
   }
 
   assignmentsAreUnique() {
@@ -756,7 +959,7 @@ export class SummerGameApp {
       return;
     }
     this.state.albaChoiceIndex = index;
-    this.renderMeetingSummary();
+    this.render();
   }
 
   startSummerPrepSelection(category) {
@@ -816,8 +1019,7 @@ export class SummerGameApp {
       return;
     }
     this.pendingSummerPrep.selectedCandidateId = candidateId;
-    this.renderSummerPrepPanel();
-    this.renderSummerDeckGrid();
+    this.render();
   }
 
   discardSummerPrepSelection() {
@@ -912,9 +1114,7 @@ export class SummerGameApp {
       return;
     }
     this.state.summerActionSelections[staffKey] = cardId;
-    this.renderSummerActionGrid();
-    this.renderSummerDeckGrid();
-    this.updateSummerActionConfirmState();
+    this.render();
   }
 
   setSummerRest(staffKey) {
@@ -922,9 +1122,7 @@ export class SummerGameApp {
       return;
     }
     this.state.summerActionSelections[staffKey] = null;
-    this.renderSummerActionGrid();
-    this.renderSummerDeckGrid();
-    this.updateSummerActionConfirmState();
+    this.render();
   }
 
   isSummerCardFlipped(staffKey, card) {
@@ -1121,6 +1319,7 @@ export class SummerGameApp {
 
   render() {
     this.renderDifficultyButtons();
+    this.syncStartOverlay();
     this.renderTurnPill();
     this.renderStatus();
     this.renderTokenDisplay();
@@ -1136,6 +1335,8 @@ export class SummerGameApp {
     this.renderStaffGrid();
     this.renderTrainingChoices();
     this.updateActionConfirmState();
+    this.renderLogMessages();
+    this.persistGameState();
   }
 
   renderDifficultyButtons() {
@@ -1201,6 +1402,17 @@ export class SummerGameApp {
     ].map((entry) => `
       <span class="token-chip ${entry.className}">${entry.label} ${tokens[entry.key] ?? 0}</span>
     `).join('');
+  }
+
+  renderLogMessages() {
+    if (!this.elements.logMessages) {
+      return;
+    }
+    this.elements.logMessages.innerHTML = (this.state.log ?? []).map((entry) => {
+      const message = typeof entry === 'string' ? entry : entry?.message ?? '';
+      const kind = typeof entry === 'string' ? 'info' : entry?.kind ?? 'info';
+      return `<div class="log-message log-${kind}">${escapeHtml(message)}</div>`;
+    }).join('');
   }
 
   renderRankCard(statKey) {
@@ -1730,7 +1942,7 @@ export class SummerGameApp {
     }
 
     this.state.summerMeetingOrganizeSelectionId = instanceId;
-    this.renderSummerMeetingOrganizePanel();
+    this.render();
   }
 
   useSummerMeetingOrganizeRemoval() {
@@ -1973,7 +2185,7 @@ export class SummerGameApp {
       return;
     }
     this.state.summerMeetingSelectionId = instanceId;
-    this.renderSummerMeetingRevivalPanel();
+    this.render();
   }
 
   selectSummerMeetingInspirationCandidate(instanceId) {
@@ -1985,8 +2197,7 @@ export class SummerGameApp {
     }
     this.pendingSummerInspiration.selectedCandidateId = instanceId;
     this.state.summerMeetingInspirationSelectionId = instanceId;
-    this.renderSummerMeetingInspirationPanel();
-    this.renderSummerDeckGrid();
+    this.render();
   }
 
   finalizeSummerMeetingInspirationSelection(staffKey) {
@@ -2290,9 +2501,8 @@ export class SummerGameApp {
   }
 
   log(message, kind = 'info') {
-    const entry = document.createElement('div');
-    entry.className = `log-message log-${kind}`;
-    entry.textContent = message;
-    this.elements.logMessages?.prepend(entry);
+    this.state.log = [{ message, kind }, ...(this.state.log ?? [])];
+    this.renderLogMessages();
+    this.persistGameState();
   }
 }
