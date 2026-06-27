@@ -897,7 +897,7 @@ test('FRESH結果で通常ケースの内訳とランクを表示する', async 
       satisfaction: 14,
       accounting: 15,
     },
-    usedTurns: Array.from({ length: 12 }, (_, index) => ({ turn: index + 1 })),
+    usedTurns: Array.from({ length: 13 }, (_, index) => ({ turn: index + 1 })),
   });
 
   await expect(page.locator('#resultArea')).toBeVisible();
@@ -928,7 +928,7 @@ test('FRESH結果で表示スコア9以上はS+になる', async ({ page }) => {
       satisfaction: 15,
       accounting: 15,
     },
-    usedTurns: Array.from({ length: 12 }, (_, index) => ({ turn: index + 1 })),
+    usedTurns: Array.from({ length: 13 }, (_, index) => ({ turn: index + 1 })),
   });
 
   await expect(page.locator('#resultRank')).toContainText('S+');
@@ -952,7 +952,7 @@ test('FRESH結果で低スコア時はEランクになる', async ({ page }) => 
       satisfaction: 3,
       accounting: 3,
     },
-    usedTurns: Array.from({ length: 12 }, (_, index) => ({ turn: index + 1 })),
+    usedTurns: Array.from({ length: 13 }, (_, index) => ({ turn: index + 1 })),
   });
 
   await expect(page.locator('#resultRank')).toContainText('E');
@@ -962,4 +962,71 @@ test('FRESH結果で低スコア時はEランクになる', async ({ page }) => 
   await expect(page.locator('#resultSummary')).toContainText('24');
   await expect(page.locator('#resultSummary')).toContainText('入退差');
   await expect(page.locator('#resultSummary')).toContainText('-24');
+});
+
+test('第13ターンの講習期行動後は会議を経て結果画面へ遷移し、usedTurnsは13件になる', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'fresh',
+    turnIndex: 12,
+    phase: 'summer-action',
+    stats: {
+      experience: 6,
+      enrollment: 8,
+      satisfaction: 10,
+      accounting: 11,
+    },
+    usedTurns: Array.from({ length: 12 }, (_, index) => ({ turn: index + 1 })),
+    staffDecks: {
+      leader: ['問合対応の基本'],
+      teacher: ['質問対応の基本'],
+      office: ['生徒面談の基本'],
+      alba: ['経理精算の基本'],
+    },
+    summerActionSelections: {
+      leader: null,
+      teacher: null,
+      office: null,
+      alba: null,
+    },
+  });
+
+  const hasOnlyPlayableTurns = await page.evaluate(async () => {
+    const { TURN_CONFIG } = await import('/js/config.js');
+    return TURN_CONFIG.length === 13 && TURN_CONFIG.every((turn) => turn.phaseKind !== 'result');
+  });
+  expect(hasOnlyPlayableTurns).toBe(true);
+
+  await expect(page.locator('#turnPill')).toContainText('第13ターン');
+  await expect(page.locator('#phasePill')).toContainText('教室会議');
+  await expect(page.locator('#summerActionPanel')).toBeVisible();
+
+  await page.locator('#summerActionConfirm').click();
+  await expect(page.locator('#summerMeetingPanel')).toBeVisible();
+
+  await page.locator('#summerMeetingConfirm').click();
+  await expect(page.locator('#resultArea')).toBeVisible();
+  await expect(page.locator('#summerArea')).toBeHidden();
+  await expect(page.locator('#resultTurn')).toContainText('13ターン完了');
+  await expect(page.locator('#turnTimeline [data-turn]')).toHaveCount(13);
+  await expect(page.locator('#turnTimeline')).not.toContainText('14');
+
+  const stateSnapshot = await page.evaluate(() => {
+    const app = window.__summerGame;
+    return {
+      phase: app.state.phase,
+      turnIndex: app.state.turnIndex,
+      usedTurnsLength: app.state.usedTurns.length,
+      lastTurn: app.state.usedTurns.at(-1)?.turn ?? null,
+    };
+  });
+
+  expect(stateSnapshot).toEqual({
+    phase: 'result',
+    turnIndex: 12,
+    usedTurnsLength: 13,
+    lastTurn: 13,
+  });
 });

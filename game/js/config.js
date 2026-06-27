@@ -127,9 +127,9 @@ export const TURN_CONFIG = [
     turn: 13,
     title: '後期4日目',
     season: '講習期',
-    phase: '結果',
+    phase: '教室会議',
     poolType: '全校',
-    phaseKind: 'result',
+    phaseKind: 'summer',
     prepCount: 0,
   },
 ];
