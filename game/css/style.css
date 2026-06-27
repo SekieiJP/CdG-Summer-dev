@@ -2632,6 +2632,52 @@ body {
     border: 1px solid var(--summer-line);
 }
 
+.summer-meeting-revival-panel {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--summer-line);
+    border-radius: 8px;
+    background: var(--summer-panel-soft);
+}
+
+.summer-meeting-revival-panel.hidden {
+    display: none;
+}
+
+.summer-revival-target-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.summer-revival-target-button {
+    width: 100%;
+    border: 1px solid var(--summer-line);
+    border-radius: 8px;
+    background: var(--summer-panel);
+    color: var(--summer-text);
+    text-align: left;
+    padding: 10px;
+    display: grid;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.summer-revival-target-button.selected {
+    border-color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.16);
+}
+
+.summer-revival-target-button .summer-card-desc {
+    font-size: 0.68rem;
+}
+
+.summer-revival-target-button .summer-card-desc,
+.summer-revival-target-button .summer-card-name {
+    overflow-wrap: anywhere;
+}
+
 .result-summary {
     list-style: none;
     padding: 0;
@@ -2768,7 +2814,8 @@ body {
     }
 
     .summer-action-grid,
-    .meeting-candidate-grid {
+    .meeting-candidate-grid,
+    .summer-revival-target-grid {
         grid-template-columns: 1fr;
     }
 

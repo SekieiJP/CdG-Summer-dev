@@ -316,3 +316,114 @@ test('中期1日目と2日目の両方を休むとSSRが復活する', async ({ 
   await expect(page.locator('#summerDeckGrid .summer-deck-card-button.flipped')).toHaveCount(0);
   await expect(page.locator('#turnPill')).toContainText('第10ターン');
 });
+
+test('講習期会議で情熱1のSR復活を複数回実行できる', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'pro',
+    tokens: { passion: 3, inspiration: 0, organize: 0 },
+    turnIndex: 5,
+    phase: 'summer-action',
+    staffDecks: {
+      leader: ['できるまで居残り！', '教材発注', '問合対応の基本'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    staffFlipped: {
+      leader: ['できるまで居残り！', '教材発注'],
+    },
+    summerActionSelections: {
+      leader: null,
+      teacher: null,
+      office: null,
+      alba: null,
+    },
+  });
+
+  await page.locator('#summerDeckGrid [data-summer-use-staff="leader"]').filter({ hasText: '問合対応の基本' }).click();
+  await page.locator('#summerActionConfirm').click();
+
+  await expect(page.locator('#summerMeetingPanel')).toBeVisible();
+  await expect(page.locator('#summerMeetingRevivalPanel')).toBeVisible();
+  await expect(page.locator('#summerMeetingRevivalTargets .summer-revival-target-button')).toHaveCount(2);
+
+  await page.locator('#summerMeetingRevivalTargets .summer-revival-target-button').filter({ hasText: 'できるまで居残り！' }).click();
+  await page.locator('#summerMeetingRevivalConfirm').click();
+  await expect(page.locator('#tokenDisplay')).toContainText('情熱 2');
+  await expect(page.locator('#summerMeetingPanel')).toBeVisible();
+  await expect(page.locator('#summerMeetingRevivalTargets .summer-revival-target-button')).toHaveCount(1);
+  await expect(page.locator('#summerMeetingSummary')).toContainText('できるまで居残り！');
+  await expect(page.locator('#logMessages')).toContainText('情熱復活: できるまで居残り！ / 情熱-1');
+
+  await page.locator('#summerMeetingRevivalTargets .summer-revival-target-button').filter({ hasText: '教材発注' }).click();
+  await page.locator('#summerMeetingRevivalConfirm').click();
+  await expect(page.locator('#tokenDisplay')).toContainText('情熱 1');
+  await expect(page.locator('#summerMeetingSummary')).toContainText('教材発注');
+
+  await page.locator('#summerMeetingConfirm').click();
+  await expect(page.locator('#turnPill')).toContainText('第7ターン');
+});
+
+test('講習期会議で情熱3のSSR復活を実行できる', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'pro',
+    tokens: { passion: 3, inspiration: 0, organize: 0 },
+    turnIndex: 5,
+    phase: 'summer-action',
+    staffDecks: {
+      leader: ['明るく広く！教室リフォーム', '経理精算の基本'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    staffFlipped: {
+      leader: ['明るく広く！教室リフォーム'],
+    },
+  });
+
+  await page.locator('#summerDeckGrid [data-summer-use-staff="leader"]').filter({ hasText: '経理精算の基本' }).click();
+  await page.locator('#summerActionConfirm').click();
+
+  await expect(page.locator('#summerMeetingRevivalPanel')).toBeVisible();
+  await expect(page.locator('#summerMeetingRevivalTargets .summer-revival-target-button')).toHaveCount(1);
+
+  await page.locator('#summerMeetingRevivalTargets .summer-revival-target-button').filter({ hasText: '明るく広く！教室リフォーム' }).click();
+  await page.locator('#summerMeetingRevivalConfirm').click();
+  await expect(page.locator('#tokenDisplay')).toContainText('情熱 0');
+  await expect(page.locator('#summerMeetingSummary')).toContainText('明るく広く！教室リフォーム');
+  await expect(page.locator('#logMessages')).toContainText('情熱復活: 明るく広く！教室リフォーム / 情熱-3');
+
+  await page.locator('#summerMeetingConfirm').click();
+  await expect(page.locator('#turnPill')).toContainText('第7ターン');
+});
+
+test('FRESHでは情熱復活UIが表示されない', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'fresh',
+    tokens: null,
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    staffDecks: {
+      leader: ['できるまで居残り！'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    staffFlipped: {
+      leader: ['できるまで居残り！'],
+    },
+  });
+
+  await expect(page.locator('#summerMeetingPanel')).toBeVisible();
+  await expect(page.locator('#summerMeetingRevivalPanel')).toBeHidden();
+  await expect(page.locator('#tokenDisplay')).toBeHidden();
+});
