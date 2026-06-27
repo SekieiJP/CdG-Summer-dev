@@ -15,6 +15,7 @@ import {
   formatDelta,
   getStaffKeysForCard,
   iconUrl,
+  parseCsv,
   shuffle,
 } from './data.js';
 
@@ -85,6 +86,22 @@ function cloneCardWithId(card, prefix = 'deck') {
 
 function sumStats(stats) {
   return STAT_KEYS.reduce((acc, item) => acc + (stats[item.key] ?? 0), 0);
+}
+
+function parseOptionalNumber(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatScore(value) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function loadText(path) {
@@ -423,16 +440,31 @@ export class SummerGameApp {
   }
 
   parseRankCsv(csvText) {
-    const [header, ...rows] = csvText.trim().split(/\r?\n/).map((row) => row.split(','));
-    const indexMap = new Map(header.map((value, index) => [value.trim(), index]));
+    const [header, ...rows] = parseCsv(csvText.trim());
+    const indexMap = new Map(header.map((value, index) => [String(value).trim(), index]));
+    const readCell = (row, name) => row[indexMap.get(name)];
+    const readNumber = (row, name) => parseOptionalNumber(readCell(row, name));
     return rows
-      .filter((row) => row.some((cell) => cell.trim()))
+      .map((row) => row.map((cell) => String(cell ?? '').trim()))
+      .filter((row) => row.some(Boolean))
       .map((row) => ({
-        rank: row[indexMap.get('ランク')]?.trim() ?? '',
-        experience: Number(row[indexMap.get('体験基準')] ?? 0),
-        enrollment: Number(row[indexMap.get('入塾基準')] ?? 0),
-        satisfaction: Number(row[indexMap.get('満足基準')] ?? 0),
-        accounting: Number(row[indexMap.get('経理基準')] ?? 0),
+        rank: readCell(row, 'ランク') ?? '',
+        thresholds: {
+          experience: readNumber(row, '体験基準'),
+          enrollment: readNumber(row, '入塾基準'),
+          satisfaction: readNumber(row, '満足基準'),
+          accounting: readNumber(row, '経理基準'),
+        },
+        scores: {
+          satisfaction: readNumber(row, '満足スコア'),
+          mobilization: readNumber(row, '動員スコア'),
+          withdrawal: readNumber(row, '退塾スコア'),
+          enrollmentDiff: readNumber(row, '入退差スコア'),
+        },
+        withdrawalThreshold: readNumber(row, '退塾基準'),
+        enrollmentDiffThreshold: readNumber(row, '入退差基準'),
+        rankThreshold: readNumber(row, 'ランク基準スコア'),
+        title: readCell(row, '称号') ?? '',
       }));
   }
 
@@ -738,7 +770,11 @@ export class SummerGameApp {
     let current = this.rankRows[0] ?? { rank: '-' };
     let next = null;
     for (const row of this.rankRows) {
-      if (value >= row[statKey]) {
+      const threshold = row.thresholds?.[statKey];
+      if (threshold === null || threshold === undefined) {
+        continue;
+      }
+      if (value >= threshold) {
         current = row;
       } else {
         next = row;
@@ -1317,6 +1353,154 @@ export class SummerGameApp {
     return STAFFS.find((staff) => staff.key === staffKey)?.label ?? staffKey;
   }
 
+  calculateFreshResult() {
+    const experience = this.state.stats.experience ?? 0;
+    const enrollment = this.state.stats.enrollment ?? 0;
+    const satisfaction = this.state.stats.satisfaction ?? 0;
+    const accounting = this.state.stats.accounting ?? 0;
+    const withdrawal = Math.max(0, 15 - satisfaction) + Math.max(0, 15 - accounting);
+    const enrollmentDiff = enrollment - withdrawal;
+
+    let withdrawalPoints = 0;
+    if (withdrawal >= 4) {
+      withdrawalPoints = -3;
+    } else if (withdrawal <= 1) {
+      withdrawalPoints = 1;
+    }
+
+    let mobilizationPoints = 0;
+    if (experience >= 12) {
+      mobilizationPoints = 2;
+    } else if (experience >= 10) {
+      mobilizationPoints = 1;
+    }
+
+    let enrollmentDiffPoints = 0;
+    for (const row of this.rankRows) {
+      const threshold = row.enrollmentDiffThreshold;
+      const score = row.scores?.enrollmentDiff;
+      if (threshold === null || threshold === undefined || score === null || score === undefined) {
+        continue;
+      }
+      if (enrollmentDiff >= threshold) {
+        enrollmentDiffPoints = score;
+      }
+    }
+
+    const baseTotal = withdrawalPoints + mobilizationPoints + enrollmentDiffPoints;
+    let displayScore = baseTotal;
+    let splusBreakdown = null;
+    if (baseTotal === 8) {
+      const expUsed = Math.min(experience, 30);
+      const diffUsed = Math.min(enrollmentDiff, 30);
+      const rawExpBonus = 0.5 * (expUsed - 12) / 18;
+      const rawDiffBonus = 1.5 * (diffUsed - 12) / 18;
+      displayScore = Math.round((8 + rawExpBonus + rawDiffBonus) * 10) / 10;
+      splusBreakdown = {
+        expUsed,
+        diffUsed,
+        expBonus: Math.round(rawExpBonus * 10) / 10,
+        diffBonus: Math.round(rawDiffBonus * 10) / 10,
+      };
+    }
+
+    let overallRank = 'E';
+    if (displayScore >= 9) {
+      overallRank = 'S+';
+    } else if (displayScore >= 8) {
+      overallRank = 'S';
+    } else if (displayScore >= 7) {
+      overallRank = 'A';
+    } else if (displayScore >= 5) {
+      overallRank = 'B';
+    } else if (displayScore >= 4) {
+      overallRank = 'C';
+    } else if (displayScore >= 1) {
+      overallRank = 'D';
+    }
+
+    return {
+      withdrawal,
+      enrollmentDiff,
+      withdrawalPoints,
+      mobilizationPoints,
+      enrollmentDiffPoints,
+      baseTotal,
+      displayScore,
+      overallRank,
+      splusBreakdown,
+    };
+  }
+
+  renderFreshResult() {
+    const freshResult = this.calculateFreshResult();
+    this.elements.resultRank.innerHTML = `
+      <span class="result-rank-label">総合ランク</span>
+      <span class="result-rank-badge rank-${freshResult.overallRank.replace('+', 'plus')}">${freshResult.overallRank}</span>
+    `;
+    this.elements.resultTurn.innerHTML = `
+      <span>基礎合計 ${freshResult.baseTotal}</span>
+      <span>表示スコア ${formatScore(freshResult.displayScore)}</span>
+      <span>${this.state.usedTurns.length}ターン完了</span>
+    `;
+    this.elements.resultSummary.innerHTML = [
+      ...STAT_KEYS.map((item) => {
+        const { current } = this.currentRankFor(item.key);
+        return `
+          <li class="result-item">
+            <span class="result-label">${item.label}</span>
+            <span class="result-value">${this.state.stats[item.key] ?? 0}</span>
+            <span class="result-rank">${current.rank}</span>
+          </li>
+        `;
+      }),
+      `
+        <li class="result-item">
+          <span class="result-label">退塾</span>
+          <span class="result-value">${freshResult.withdrawal}</span>
+          <span class="result-rank">15-満足 / 15-経理</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">入退差</span>
+          <span class="result-value">${freshResult.enrollmentDiff}</span>
+          <span class="result-rank">入塾-退塾</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">退塾点</span>
+          <span class="result-value">${freshResult.withdrawalPoints > 0 ? `+${freshResult.withdrawalPoints}` : freshResult.withdrawalPoints}</span>
+          <span class="result-rank">退塾 ${freshResult.withdrawal}</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">動員点</span>
+          <span class="result-value">${freshResult.mobilizationPoints > 0 ? `+${freshResult.mobilizationPoints}` : freshResult.mobilizationPoints}</span>
+          <span class="result-rank">体験 ${this.state.stats.experience ?? 0}</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">入退差点</span>
+          <span class="result-value">${freshResult.enrollmentDiffPoints > 0 ? `+${freshResult.enrollmentDiffPoints}` : freshResult.enrollmentDiffPoints}</span>
+          <span class="result-rank">入退差 ${freshResult.enrollmentDiff}</span>
+        </li>
+      `,
+      `
+        <li class="result-item result-item-accent">
+          <span class="result-label">合計 / 表示スコア</span>
+          <span class="result-value">${freshResult.baseTotal} / ${formatScore(freshResult.displayScore)}</span>
+          <span class="result-rank">${freshResult.splusBreakdown
+            ? `体験+${formatScore(freshResult.splusBreakdown.expBonus)} 入退差+${formatScore(freshResult.splusBreakdown.diffBonus)}`
+            : `総合ランク ${freshResult.overallRank}`}</span>
+        </li>
+      `,
+    ].join('');
+  }
+
   render() {
     this.renderDifficultyButtons();
     this.syncStartOverlay();
@@ -1432,8 +1616,8 @@ export class SummerGameApp {
     const label = container.querySelector('.rank-label');
     const deficit = container.querySelector('.rank-deficit');
     label.textContent = current.rank || '-';
-    const start = current[statKey] ?? 0;
-    const end = next?.[statKey] ?? start;
+    const start = current.thresholds?.[statKey] ?? 0;
+    const end = next?.thresholds?.[statKey] ?? start;
     const ratio = end > start ? ((value - start) / (end - start)) * 100 : 100;
     progress.style.width = `${Math.max(0, Math.min(100, ratio))}%`;
     if (next) {
@@ -2380,6 +2564,10 @@ export class SummerGameApp {
 
   renderResult() {
     if (this.state.phase !== 'result' || !this.elements.resultSummary) {
+      return;
+    }
+    if (this.state.difficulty === 'fresh') {
+      this.renderFreshResult();
       return;
     }
     const total = sumStats(this.state.stats);

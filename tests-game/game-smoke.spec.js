@@ -47,6 +47,17 @@ async function setupGame(page, config) {
       app.state.lastDrawId = app.state.hand[0]?.instanceId ?? null;
     }
 
+    if (payload.stats) {
+      app.state.stats = {
+        ...app.state.stats,
+        ...payload.stats,
+      };
+    }
+
+    if (payload.usedTurns) {
+      app.state.usedTurns = payload.usedTurns.map((entry) => ({ ...entry }));
+    }
+
     if (payload.assignments) {
       app.state.assignments = { ...payload.assignments };
     }
@@ -870,4 +881,85 @@ test('FRESHでは情熱復活UIが表示されない', async ({ page }) => {
   await expect(page.locator('#summerMeetingPanel')).toBeVisible();
   await expect(page.locator('#summerMeetingRevivalPanel')).toBeHidden();
   await expect(page.locator('#tokenDisplay')).toBeHidden();
+});
+
+test('FRESH結果で通常ケースの内訳とランクを表示する', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'fresh',
+    turnIndex: 12,
+    phase: 'result',
+    stats: {
+      experience: 10,
+      enrollment: 14,
+      satisfaction: 14,
+      accounting: 15,
+    },
+    usedTurns: Array.from({ length: 12 }, (_, index) => ({ turn: index + 1 })),
+  });
+
+  await expect(page.locator('#resultArea')).toBeVisible();
+  await expect(page.locator('#resultRank')).toContainText('A');
+  await expect(page.locator('#resultTurn')).toContainText('基礎合計 7');
+  await expect(page.locator('#resultTurn')).toContainText('表示スコア 7');
+  await expect(page.locator('#resultSummary')).toContainText('退塾');
+  await expect(page.locator('#resultSummary')).toContainText('1');
+  await expect(page.locator('#resultSummary')).toContainText('入退差');
+  await expect(page.locator('#resultSummary')).toContainText('13');
+  await expect(page.locator('#resultSummary')).toContainText('退塾点');
+  await expect(page.locator('#resultSummary')).toContainText('+1');
+  await expect(page.locator('#resultSummary')).toContainText('動員点');
+  await expect(page.locator('#resultSummary')).toContainText('入退差点');
+});
+
+test('FRESH結果で表示スコア9以上はS+になる', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'fresh',
+    turnIndex: 12,
+    phase: 'result',
+    stats: {
+      experience: 12,
+      enrollment: 24,
+      satisfaction: 15,
+      accounting: 15,
+    },
+    usedTurns: Array.from({ length: 12 }, (_, index) => ({ turn: index + 1 })),
+  });
+
+  await expect(page.locator('#resultRank')).toContainText('S+');
+  await expect(page.locator('#resultTurn')).toContainText('基礎合計 8');
+  await expect(page.locator('#resultTurn')).toContainText('表示スコア 9');
+  await expect(page.locator('#resultSummary')).toContainText('合計 / 表示スコア');
+  await expect(page.locator('#resultSummary')).toContainText('8 / 9');
+});
+
+test('FRESH結果で低スコア時はEランクになる', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'fresh',
+    turnIndex: 12,
+    phase: 'result',
+    stats: {
+      experience: 0,
+      enrollment: 0,
+      satisfaction: 3,
+      accounting: 3,
+    },
+    usedTurns: Array.from({ length: 12 }, (_, index) => ({ turn: index + 1 })),
+  });
+
+  await expect(page.locator('#resultRank')).toContainText('E');
+  await expect(page.locator('#resultTurn')).toContainText('基礎合計 -3');
+  await expect(page.locator('#resultTurn')).toContainText('表示スコア -3');
+  await expect(page.locator('#resultSummary')).toContainText('退塾');
+  await expect(page.locator('#resultSummary')).toContainText('24');
+  await expect(page.locator('#resultSummary')).toContainText('入退差');
+  await expect(page.locator('#resultSummary')).toContainText('-24');
 });
