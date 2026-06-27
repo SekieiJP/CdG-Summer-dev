@@ -318,11 +318,11 @@
 ## 9. ゲーム終了処理とスコア計算
 
 1. 後期4日目(ターン13)の教室会議フェーズが終了した時点でゲーム終了。
-2. 通常期+講習期で累積した4指標(体験/入塾/満足/経理)を最終評価対象とする。
+2. 通常期+講習期で累積したステータスから、**動員 / 退塾 / 入退差 / 満足** の4観点で最終評価する。
 3. 春期のランクCSV(rankFresh/rankPro)と同じ構造の **`rankSummerFresh.csv` / `rankSummerPro.csv`** を新設する(A12-2)。
    - 当面は春期講習の `rankFresh.csv` / `rankPro.csv` の閾値をコピーして仮利用する(A12-3)。
    - 後日、13ターン構成、講習期4枚配置、おすすめ行動ボーナス +2 倍率を踏まえて夏期用に改訂する。
-4. 各観点の得点を合計し、総合ランクを判定する(春期準拠)。
+4. 各観点の得点を合計して総合ランクを判定し、**PROの称号は `rankSummerPro.csv` の称号列を正として表示する**(春期準拠)。
 5. ゲーム終了時の追加処理はなし(春期準拠、A12-4)。
 
 ---
@@ -504,7 +504,7 @@ CdG-Summer-dev/
 ### 13.2 CSV(夏期で新規 / 改修)
 
 - `rankSummerFresh.csv` — 春期 `rankFresh.csv` と同構造で新設し、当面は春期値を仮利用する。後日、夏期用閾値へ改訂する(A12-2, A12-3)
-- `rankSummerPro.csv` — 春期 `rankPro.csv` と同構造で新設し、当面は春期値を仮利用する。後日、夏期用閾値へ改訂する(A12-2, A12-3)
+- `rankSummerPro.csv` — 春期 `rankPro.csv` と同構造で新設し、当面は春期値を仮利用する。後日、夏期用閾値へ改訂する(A12-2, A12-3)。PRO称号は本CSVの称号列を正とする。
 
 ### 13.3 データ読込フロー
 
@@ -834,7 +834,7 @@ const summerTokenEffects = {
 | 項目 | 春期 | 夏期(案) |
 |---|---|---|
 | ターン数 | 8 | 13(通常期4 + 講習期9) |
-| 評価指標 | 体験/入塾/満足/経理 | 同じ |
+| 評価指標 | 動員 / 退塾 / 入退差 / 満足 | 同じ(通常期+講習期の累積ステータスから算出) |
 | ランクCSV | rankFresh / rankPro | rankSummerFresh / rankSummerPro(新規、A12-2) |
 | 1ターン当たりカード使用枚数 | 3スタッフ × 1 = 3 | 通常期 3 + 講習期 4(並行カードで増加可) |
 | おすすめ行動ボーナス | カテゴリ別+1/枚 | カテゴリ別+2/枚 |
@@ -849,14 +849,14 @@ function calcSummerScore(player, difficulty) {
   const enrollmentDiff = player.enrollment - taisyutsu;
   const scores = {
     mobilization:   evalThreshold(rankTable, 'experience', player.experience),
+    withdrawal:     evalThreshold(rankTable, 'withdrawal', taisyutsu),
     enrollmentDiff: evalThreshold(rankTable, 'enrollmentDiff', enrollmentDiff),
     satisfaction:   evalThreshold(rankTable, 'satisfaction', player.satisfaction),
-    accounting:     evalThreshold(rankTable, 'accounting', player.accounting),
-    withdrawal:     evalThreshold(rankTable, 'withdrawal', taisyutsu),
   };
   const totalScore = sumScores(scores);
   const grade = lookupGrade(rankTable, totalScore);
-  return { scores, totalScore, grade };
+  const title = difficulty === 'pro' ? lookupTitle(rankTable, grade) : null;
+  return { scores, totalScore, grade, title };
 }
 ```
 
@@ -1114,3 +1114,4 @@ function calcSummerScore(player, difficulty) {
 | 2026-06-22 | v0.2 | 回答1(カテゴリ1〜9)反映。講習期9ターン構成、Nカード講習デッキ移動、おすすめ行動 +2 倍率、講習期準備=春期式3枚から1枚等を確定。新規TBD Q5-9/Q5-10 を追加 |
 | 2026-06-26 | v0.3 | `CdG-Summer-OpenQuestions-answer.txt` を正としてカテゴリ10〜15を反映。PRO限定トークンを講習期トークン(情熱/発想/整理)へ用語更新し、リポジトリ資産管理方針を追加。 |
 | 2026-06-27 | v0.4 | Q12-3を春期rank閾値の仮利用として更新し、Q5-9/Q5-10を確定。春期CSS、カテゴリ/レアリティ色、カード効果発動演出、ステータスプログレスゲージの継承方針を追加。 |
+| 2026-06-27 | v0.5 | 夏期PRO結果計算を春期同様の4観点評価(動員/退塾/入退差/満足)へ統一し、`rankSummerPro.csv` の称号列を正とする方針を反映。 |

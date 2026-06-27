@@ -1,5 +1,7 @@
 # 夏期スコア仕様確認メモ
 
+**ステータス**: 解決済み
+
 ## 背景
 
 - `docs/CdG-Summer-Spec.md` §19.2 の擬似コードは、PRO結果計算が経理を含む5観点採点に見える。
@@ -27,11 +29,13 @@
 **A** を推奨。  
 理由: 仕様本文の春期準拠方針、Spring-resource実装、既存 `rankSummerPro.csv` が一致しており、差分が最小のため。
 
-## 回答欄
+## 回答
 
-回答: [A / B]
+- 決定: **選択肢A: 春期と同じ4観点評価**
+- 決定日: **2026-06-27**
+- 決定理由: 仕様本文の春期準拠方針、`Spring-resource/CdG-Spring-dev/game/js/scoreManager.js`、既存の `game/data/rankSummerPro.csv` がいずれも4観点評価で整合しており、差分を最小にできるため。
 
-## 補足案
+## 決定内容
 
 - PRO称号は、`game/data/rankSummerPro.csv` の称号列を正として扱う。
 
