@@ -131,6 +131,7 @@ export class SummerGameApp {
         office: { mid1: null, mid2: null },
         alba: { mid1: null, mid2: null },
       },
+      summerMeetingOrganizeSelectionId: null,
       summerActionSelections: {
         leader: null,
         teacher: null,
@@ -229,6 +230,10 @@ export class SummerGameApp {
       'summerMeetingRevivalStatus',
       'summerMeetingRevivalTargets',
       'summerMeetingRevivalConfirm',
+      'summerMeetingOrganizePanel',
+      'summerMeetingOrganizeStatus',
+      'summerMeetingOrganizeTargets',
+      'summerMeetingOrganizeConfirm',
       'summerMeetingInspirationPanel',
       'summerMeetingInspirationStatus',
       'summerMeetingInspirationChoices',
@@ -258,6 +263,7 @@ export class SummerGameApp {
     this.elements.meetingConfirm?.addEventListener('click', () => this.commitMeetingPhase());
     this.elements.summerActionConfirm?.addEventListener('click', () => this.resolveSummerActionPhase());
     this.elements.summerMeetingRevivalConfirm?.addEventListener('click', () => this.useSummerMeetingPassionRevival());
+    this.elements.summerMeetingOrganizeConfirm?.addEventListener('click', () => this.useSummerMeetingOrganizeRemoval());
     this.elements.summerMeetingConfirm?.addEventListener('click', () => this.commitMeetingPhase());
     this.elements.summerDiscardButton?.addEventListener('click', () => this.discardSummerPrepSelection());
 
@@ -303,6 +309,14 @@ export class SummerGameApp {
         return;
       }
       this.selectSummerMeetingRevivalCandidate(button.dataset.summerRevivalId);
+    });
+
+    this.elements.summerMeetingOrganizeTargets?.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-summer-organize-id]');
+      if (!button) {
+        return;
+      }
+      this.selectSummerMeetingOrganizeCandidate(button.dataset.summerOrganizeId);
     });
 
     this.elements.summerMeetingInspirationChoices?.addEventListener('click', (event) => {
@@ -374,6 +388,7 @@ export class SummerGameApp {
     this.pendingSummerInspiration = null;
     this.summerPrepTotal = 0;
     this.state.summerMeetingSelectionId = null;
+    this.state.summerMeetingOrganizeSelectionId = null;
     this.state.summerMeetingInspirationSelectionId = null;
   }
 
@@ -457,6 +472,7 @@ export class SummerGameApp {
     this.pendingSummerInspiration = null;
     this.state.albaChoiceIndex = null;
     this.state.summerMeetingSelectionId = null;
+    this.state.summerMeetingOrganizeSelectionId = null;
     this.state.summerMeetingInspirationSelectionId = null;
 
     if (turn.season === '通常期') {
@@ -499,6 +515,7 @@ export class SummerGameApp {
     this.pendingSummerPrep = null;
     this.pendingSummerInspiration = null;
     this.state.summerMeetingSelectionId = null;
+    this.state.summerMeetingOrganizeSelectionId = null;
     this.state.summerMeetingInspirationSelectionId = null;
     if (nextIndex >= TURN_CONFIG.length) {
       this.state.phase = 'result';
@@ -1482,6 +1499,7 @@ export class SummerGameApp {
     this.renderSummerDeckGrid();
     this.renderSummerMeetingSummary();
     this.renderSummerMeetingRevivalPanel();
+    this.renderSummerMeetingOrganizePanel();
     this.renderSummerMeetingInspirationPanel();
     this.updateSummerActionConfirmState();
   }
@@ -1663,13 +1681,115 @@ export class SummerGameApp {
     const used = this.pendingMeeting.usedCards.map((item) => `${this.getStaffLabel(item.staffKey)}: ${item.card.cardName}`).join(' / ') || 'なし';
     const rested = SUMMER_STAFF_ORDER.filter((staffKey) => !this.state.staffRestActivity[staffKey]).map((staffKey) => this.getStaffLabel(staffKey)).join(' / ') || 'なし';
     const revived = this.pendingMeeting.revivedCards.map((item) => `${this.getStaffLabel(item.staffKey)}: ${item.card.cardName}`).join(' / ') || 'なし';
+    const organized = this.pendingMeeting.organizeRemovedCards?.map((item) => `${this.getStaffLabel(item.staffKey)}: ${item.card.cardName}`).join(' / ') || 'なし';
     const added = this.pendingMeeting.inspirationAcquiredCards?.map((item) => `${this.getStaffLabel(item.staffKey)}: ${item.card.cardName}`).join(' / ') || 'なし';
     this.elements.summerMeetingSummary.innerHTML = `
       <div class="meeting-summary-item">使用: ${used}</div>
       <div class="meeting-summary-item">休憩: ${rested}</div>
       <div class="meeting-summary-item">復活: ${revived}</div>
+      <div class="meeting-summary-item">削除: ${organized}</div>
       <div class="meeting-summary-item">追加: ${added}</div>
     `;
+  }
+
+  getSummerMeetingOrganizeCandidates() {
+    if (this.state.phase !== 'summer-meeting' || this.pendingMeeting?.kind !== 'summer') {
+      return [];
+    }
+
+    const candidates = [];
+    for (const staffKey of SUMMER_STAFF_ORDER) {
+      for (const card of this.state.staffDecks?.[staffKey] ?? []) {
+        candidates.push({ staffKey, card });
+      }
+    }
+    return candidates;
+  }
+
+  getSummerMeetingSelectedOrganizeCandidate() {
+    const selectedId = this.state.summerMeetingOrganizeSelectionId;
+    if (!selectedId) {
+      return null;
+    }
+    return this.getSummerMeetingOrganizeCandidates().find((item) => item.card.instanceId === selectedId) ?? null;
+  }
+
+  selectSummerMeetingOrganizeCandidate(instanceId) {
+    if (this.pendingSummerInspiration) {
+      this.log('発想追加を先に確定してください', 'error');
+      return;
+    }
+    if ((this.state.tokens?.organize ?? 0) < 1) {
+      this.log('整理が足りません', 'error');
+      return;
+    }
+
+    const candidate = this.getSummerMeetingOrganizeCandidates().find((item) => item.card.instanceId === instanceId);
+    if (!candidate) {
+      return;
+    }
+
+    this.state.summerMeetingOrganizeSelectionId = instanceId;
+    this.renderSummerMeetingOrganizePanel();
+  }
+
+  useSummerMeetingOrganizeRemoval() {
+    if (this.state.difficulty !== 'pro' || this.state.phase !== 'summer-meeting' || this.pendingMeeting?.kind !== 'summer') {
+      return;
+    }
+    if (this.pendingSummerInspiration) {
+      this.log('発想追加を先に確定してください', 'error');
+      return;
+    }
+
+    const candidate = this.getSummerMeetingSelectedOrganizeCandidate();
+    if (!candidate) {
+      this.log('整理の対象を選んでください', 'error');
+      return;
+    }
+
+    const tokens = this.state.tokens;
+    if (!tokens || (tokens.organize ?? 0) < 1) {
+      this.log('整理が足りません', 'error');
+      return;
+    }
+
+    const deck = this.state.staffDecks?.[candidate.staffKey];
+    if (!Array.isArray(deck)) {
+      return;
+    }
+
+    const cardIndex = deck.findIndex((card) => card.instanceId === candidate.card.instanceId);
+    if (cardIndex < 0) {
+      this.log('選択したカードは対象外です', 'error');
+      this.renderSummerMeetingOrganizePanel();
+      return;
+    }
+
+    const [removedCard] = deck.splice(cardIndex, 1);
+    const wasFlipped = !!this.state.staffFlipped?.[candidate.staffKey]?.delete(removedCard.instanceId);
+    this.state.tokens = {
+      ...tokens,
+      organize: (tokens.organize ?? 0) - 1,
+    };
+    this.state.summerMeetingOrganizeSelectionId = null;
+    this.pendingMeeting.organizeRemovedCards = this.pendingMeeting.organizeRemovedCards ?? [];
+    this.pendingMeeting.organizeRemovedCards.push({
+      type: 'summer-organize-remove',
+      staffKey: candidate.staffKey,
+      card: removedCard,
+      flipped: wasFlipped,
+    });
+    this.log(`整理削除: ${removedCard.cardName} を ${this.getStaffLabel(candidate.staffKey)} デッキから削除 / 整理-1`);
+    this.showStatusAnimation([
+      {
+        type: 'summer-organize-remove',
+        staffKey: candidate.staffKey,
+        card: removedCard,
+        flipped: wasFlipped,
+      },
+    ]);
+    this.render();
   }
 
   renderSummerMeetingInspirationPanel() {
@@ -1732,6 +1852,77 @@ export class SummerGameApp {
       </div>
       <div class="meeting-summary-item">追加先はデッキ下部のボタンで選びます。</div>
     `;
+  }
+
+  renderSummerMeetingOrganizePanel() {
+    if (!this.elements.summerMeetingOrganizePanel || !this.elements.summerMeetingOrganizeStatus || !this.elements.summerMeetingOrganizeTargets) {
+      return;
+    }
+
+    const visible = this.state.phase === 'summer-meeting' && this.pendingMeeting?.kind === 'summer' && this.state.difficulty === 'pro' && !!this.state.tokens;
+    this.elements.summerMeetingOrganizePanel.classList.toggle('hidden', !visible);
+    if (!visible) {
+      this.elements.summerMeetingOrganizeStatus.innerHTML = '';
+      this.elements.summerMeetingOrganizeTargets.innerHTML = '';
+      if (this.elements.summerMeetingOrganizeConfirm) {
+        this.elements.summerMeetingOrganizeConfirm.disabled = true;
+        this.elements.summerMeetingOrganizeConfirm.textContent = '選択カードを削除';
+      }
+      return;
+    }
+
+    const organize = this.state.tokens?.organize ?? 0;
+    const selected = this.getSummerMeetingSelectedOrganizeCandidate();
+    const candidates = this.getSummerMeetingOrganizeCandidates();
+    const lockedByInspiration = !!this.pendingSummerInspiration;
+
+    this.elements.summerMeetingOrganizeStatus.innerHTML = [
+      `<div class="meeting-summary-item">残り整理: ${organize}</div>`,
+      `<div class="meeting-summary-item">削除候補: ${candidates.length}件</div>`,
+      `<div class="meeting-summary-item">${lockedByInspiration ? '発想追加の候補選択中は整理を使えません。' : '任意のスタッフ別デッキから1枚を削除できます。'}</div>`,
+    ].join('');
+
+    this.elements.summerMeetingOrganizeTargets.innerHTML = candidates.length > 0
+      ? SUMMER_STAFF_ORDER.map((staffKey) => {
+        const deck = this.state.staffDecks?.[staffKey] ?? [];
+        const staffCards = deck.map((card) => {
+          const flipped = this.isSummerCardFlipped(staffKey, card);
+          const selectedClass = selected?.card.instanceId === card.instanceId ? 'selected' : '';
+          const disabled = organize < 1 || lockedByInspiration;
+          return `
+            <button type="button" class="summer-deck-card-button ${selectedClass} ${flipped ? 'flipped' : ''} ${disabled ? 'disabled' : ''}" data-summer-organize-id="${card.instanceId}" data-summer-organize-staff="${staffKey}" ${disabled ? 'disabled' : ''}>
+              <div class="summer-card-top">
+                <span class="summer-card-name">${card.cardName}</span>
+                <span class="card-rarity rarity-${card.rarity}">${card.rarity}</span>
+              </div>
+              <div class="summer-card-meta">
+                <span class="card-category-text category-${card.category}">${card.category}</span>
+                <span class="summer-deck-card-badge">${flipped ? '裏返し' : '削除可'}</span>
+              </div>
+              <div class="summer-card-desc">${textToHtml(card.topEffect || card.effect)}</div>
+            </button>
+          `;
+        }).join('') || '<div class="meeting-summary-item">カードなし</div>';
+
+        return `
+          <article class="summer-organize-column">
+            <div class="summer-deck-column-head">
+              <strong class="summer-deck-title">${this.getStaffLabel(staffKey)}</strong>
+              <span class="summer-deck-count">${deck.length}枚</span>
+            </div>
+            <div class="summer-organize-card-list">
+              ${staffCards}
+            </div>
+          </article>
+        `;
+      }).join('')
+      : '<div class="meeting-summary-item">対象なし</div>';
+
+    if (this.elements.summerMeetingOrganizeConfirm) {
+      const disabled = !selected || organize < 1 || lockedByInspiration;
+      this.elements.summerMeetingOrganizeConfirm.disabled = disabled;
+      this.elements.summerMeetingOrganizeConfirm.textContent = '選択カードを削除';
+    }
   }
 
   getSummerMeetingPassionCost(card) {
@@ -1972,7 +2163,7 @@ export class SummerGameApp {
     } else if (turn.phaseKind === 'result') {
       this.elements.phaseDescription.textContent = '結果画面。累積した4指標からランクを表示します。';
     } else {
-      this.elements.phaseDescription.textContent = `${turn.season}の教室会議。休憩したスタッフの SR / SSR を復活させます。${prepText}。`;
+      this.elements.phaseDescription.textContent = `${turn.season}の教室会議。休憩したスタッフの SR / SSR を復活させます。PROでは発想追加と整理削除も行えます。${prepText}。`;
     }
   }
 
@@ -2069,6 +2260,9 @@ export class SummerGameApp {
       }
       if (item.type === 'summer-revival-ssr') {
         return `<div class="animation-card-item">${this.getStaffLabel(item.staffKey)} の SSR が復活しました</div>`;
+      }
+      if (item.type === 'summer-organize-remove') {
+        return `<div class="animation-card-item">${this.getStaffLabel(item.staffKey)} の ${item.card.cardName} を削除しました</div>`;
       }
       if (item.type === 'summer-prep-exchange') {
         return `<div class="animation-card-item">${item.card.cardName} を交換候補に選びました</div>`;

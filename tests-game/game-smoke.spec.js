@@ -118,6 +118,14 @@ async function setupGame(page, config) {
   }, config);
 }
 
+async function getCardInstanceId(page, staffKey, cardName) {
+  return page.evaluate(({ staffKey, cardName }) => {
+    const app = window.__summerGame;
+    const card = app?.state.staffDecks?.[staffKey]?.find((item) => item.cardName === cardName);
+    return card?.instanceId ?? null;
+  }, { staffKey, cardName });
+}
+
 test('通常期の教室行動でアルバイト講師候補を選んで次ターンへ進める', async ({ page }) => {
   await page.goto('/');
   await page.locator('#startGame').click();
@@ -508,6 +516,156 @@ test('未選択の2枚は同じ山の捨て札へ戻る', async ({ page }) => {
     return app.trainingDiscards.地域.動員.map((card) => card.cardName);
   });
   expect(discarded).toEqual(['元塾生に講習案内', '兄弟紹介']);
+});
+
+test('講習期会議で整理1を使って通常カードを削除できる', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'pro',
+    tokens: { passion: 3, inspiration: 0, organize: 1 },
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    pendingMeeting: {
+      kind: 'summer',
+      usedCards: [],
+      statsBefore: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      statsAfter: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      revivedCards: [],
+      resolution: [],
+    },
+    staffDecks: {
+      leader: ['問合対応の基本'],
+      teacher: ['教材発注'],
+      office: [],
+      alba: [],
+    },
+  });
+
+  const targetId = await getCardInstanceId(page, 'leader', '問合対応の基本');
+
+  await expect(page.locator('#summerMeetingOrganizePanel')).toBeVisible();
+  await page.locator(`#summerMeetingOrganizeTargets [data-summer-organize-id="${targetId}"]`).click();
+  await page.locator('#summerMeetingOrganizeConfirm').click();
+
+  await expect(page.locator('#tokenDisplay')).toContainText('整理 0');
+  await expect(page.locator('#summerMeetingSummary')).toContainText('削除: 室長: 問合対応の基本');
+  await expect(page.locator('#summerDeckGrid')).not.toContainText('問合対応の基本');
+  await expect(page.locator('#logMessages')).toContainText('整理削除: 問合対応の基本 を 室長 デッキから削除 / 整理-1');
+});
+
+test('講習期会議で裏返しSRを削除するとstaffFlippedからも消える', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'pro',
+    tokens: { passion: 3, inspiration: 0, organize: 1 },
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    pendingMeeting: {
+      kind: 'summer',
+      usedCards: [],
+      statsBefore: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      statsAfter: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 5 },
+      revivedCards: [],
+      resolution: [],
+    },
+    staffDecks: {
+      leader: ['できるまで居残り！', '問合対応の基本'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    staffFlipped: {
+      leader: ['できるまで居残り！'],
+    },
+  });
+
+  const targetId = await getCardInstanceId(page, 'leader', 'できるまで居残り！');
+
+  await page.locator(`#summerMeetingOrganizeTargets [data-summer-organize-id="${targetId}"]`).click();
+  await page.locator('#summerMeetingOrganizeConfirm').click();
+
+  await expect(page.locator('#summerDeckGrid')).not.toContainText('できるまで居残り！');
+  await expect(page.locator('#logMessages')).toContainText('整理削除: できるまで居残り！ を 室長 デッキから削除 / 整理-1');
+  await page.evaluate(({ targetId }) => {
+    const app = window.__summerGame;
+    if (app.state.staffFlipped.leader.has(targetId)) {
+      throw new Error('flipped id still present');
+    }
+  }, { targetId });
+});
+
+test('FRESHでは整理削除UIが表示されず、整理不足では削除できない', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#startGame').click();
+
+  await setupGame(page, {
+    difficulty: 'fresh',
+    tokens: null,
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    pendingMeeting: {
+      kind: 'summer',
+      usedCards: [],
+      statsBefore: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 3 },
+      statsAfter: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 3 },
+      revivedCards: [],
+      resolution: [],
+    },
+    staffDecks: {
+      leader: ['できるまで居残り！'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    staffFlipped: {
+      leader: ['できるまで居残り！'],
+    },
+  });
+
+  await expect(page.locator('#summerMeetingOrganizePanel')).toBeHidden();
+
+  await setupGame(page, {
+    difficulty: 'pro',
+    tokens: { passion: 3, inspiration: 0, organize: 0 },
+    turnIndex: 5,
+    phase: 'summer-meeting',
+    pendingMeeting: {
+      kind: 'summer',
+      usedCards: [],
+      statsBefore: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 3 },
+      statsAfter: { experience: 0, enrollment: 0, satisfaction: 3, accounting: 3 },
+      revivedCards: [],
+      resolution: [],
+    },
+    staffDecks: {
+      leader: ['できるまで居残り！'],
+      teacher: [],
+      office: [],
+      alba: [],
+    },
+    staffFlipped: {
+      leader: ['できるまで居残り！'],
+    },
+  });
+
+  const targetId = await getCardInstanceId(page, 'leader', 'できるまで居残り！');
+  await page.evaluate(({ targetId }) => {
+    const app = window.__summerGame;
+    app.state.summerMeetingOrganizeSelectionId = targetId;
+    app.useSummerMeetingOrganizeRemoval();
+  }, { targetId });
+
+  await expect(page.locator('#logMessages')).toContainText('整理が足りません');
+  await page.evaluate(({ targetId }) => {
+    const app = window.__summerGame;
+    if (app.state.staffDecks.leader.length !== 1 || !app.state.staffDecks.leader.some((card) => card.instanceId === targetId)) {
+      throw new Error('card changed unexpectedly');
+    }
+  }, { targetId });
 });
 
 test('FRESHでは発想追加UIが表示されない', async ({ page }) => {
