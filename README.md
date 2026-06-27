@@ -13,9 +13,13 @@
 
 ## 公開対象
 
-GitHub Pages は `.github/workflows/static.yml` で `public/` だけを公開します。春期由来の `game/`, `solver/`, `gas/` などは公開対象に含めません。
+GitHub Pages は `.github/workflows/static.yml` 内で一時ディレクトリ `_site/` を組み立てて公開します。公開物の構成は次のとおりです。
 
-現在の `public/index.html` は、夏期講習編のゲーム全体フローを確認するためのUIモックアップです。
+- `public/` の内容を `_site/` 直下へ配置し、ルート `https://sekieijp.github.io/CdG-Summer-dev/` では現行モックを維持する
+- `game/` の内容を `_site/game/` へ配置し、`https://sekieijp.github.io/CdG-Summer-dev/game/` で夏期ゲーム本体を公開する
+- `Spring-resource/`、`docs/`、開発設定、テスト、検証生成物は Pages artifact に含めない
+
+`public/index.html` は、夏期講習編のゲーム全体フローを確認するためのUIモックアップです。`game/` は Pages の `/game/` 専用公開物として扱います。
 
 ## 初期整備方針
 

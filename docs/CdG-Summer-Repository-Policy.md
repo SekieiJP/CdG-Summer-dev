@@ -22,8 +22,8 @@
 |---|---|---|
 | S0: 夏期一次成果物 | GitHub 管理する | `docs/CdG-Summer-Spec.md`, `docs/CdG-Summer-Overview.txt`, `docs/CdG-Summer-OpenQuestions-answer.txt`, 本方針文書 |
 | S0: 夏期公開モック | GitHub 管理する | `public/index.html`, `tests-public/`, `.github/workflows/static.yml` |
-| S1: 夏期へコピーして使う共有資産 | 夏期で使うことを確認してから GitHub 管理する | `game/data/cards_fresh.csv`, `game/data/cards_pro.csv`, `game/data/cardIcon/` |
-| S2: 春期コード参照元 | 参照のみ。夏期実装に必要な単位でコピーして改修する | `game/js/`, `game/css/`, `tests/`, `game/index.html`, `game/tutorial.html` |
+| S1: 夏期 Pages 公開ゲーム | GitHub 管理する | `game/index.html`, `game/js/`, `game/css/`, `game/data/` |
+| S2: 非公開の参照資産 | 参照のみ。Pages artifact に含めない | `Spring-resource/`, `solver/`, `gas/`, 開発用 docs・テスト・設定 |
 | S3: 春期固有・検証生成物 | 原則 GitHub 管理しない | `solver/`, `gas/`, `playwright-report/`, `test-results/`, `game/releaseNote.html`, 春期ルールブック |
 | S4: ローカル・環境依存 | GitHub 管理しない | `.DS_Store`, `node_modules/`, `ga4tag.txt`, 一時ツール |
 
@@ -36,7 +36,7 @@
 ```text
 CdG-Summer-dev/
 ├── .github/
-│   └── workflows/static.yml        # GitHub Pages は public/ のみ公開
+│   └── workflows/static.yml        # GitHub Pages は _site を組み立てて root と /game/ を公開
 ├── AGENTS.md
 ├── docs/
 │   ├── CdG-Summer-Overview.txt
@@ -55,7 +55,7 @@ CdG-Summer-dev/
 └── README.md
 ```
 
-`game/`, `tests/`, `scripts/` は春期版が残っている間は丸ごと初期公開しない。夏期仕様に合わせて置き換えるか、必要ファイルをコピーして差分が説明できる状態になってから追加する。UIモックとその検証は、春期版 `game/` とは分離して `public/` と `tests-public/` で管理する。
+Pages 公開では `public/` をルート `/`、`game/` を `/game/` として artifact に詰める。UIモックとその検証は `public/` と `tests-public/` で管理し、`game/` は夏期実装本体として公開する。一方で `Spring-resource/` はローカル参照専用とし、Pages artifact に含めない。
 
 ---
 
@@ -63,7 +63,7 @@ CdG-Summer-dev/
 
 ### 4.1 ローカル参照元を残す
 
-現在の春期由来ファイル群は、夏期実装中の参照元としてローカルに残してよい。ただし GitHub に載せる作業ツリーとは分ける。
+`Spring-resource/` のような春期由来ファイル群は、夏期実装中の参照元としてローカルに残してよい。ただし GitHub Pages の公開物には含めない。
 
 推奨:
 
@@ -87,7 +87,6 @@ CdG-Summer-dev/
 
 初期状態では以下を push 対象から外す。
 
-- 春期版 `game/` の実装一式
 - 春期版 `tests/` のE2E一式
 - `solver/` 配下の探索ログ、JSON、スコア記録、分析メモ
 - `gas/` 配下の春期用 Apps Script
@@ -115,7 +114,7 @@ CdG-Summer-dev/
 
 - `git status --short` で春期固有ファイルが混ざっていないこと。
 - `solver/`, `gas/`, `playwright-report/`, `test-results/`, `node_modules/`, `.DS_Store` が含まれていないこと。
-- `game/` を含める場合、春期画面・春期ルール名・春期 release note が残っていないこと。
+- `game/` を Pages へ含める場合、公開対象が `game/index.html`, `game/js/`, `game/css/`, `game/data/` に閉じており、`Spring-resource/` を参照していないこと。
 - `rankSummerFresh.csv` / `rankSummerPro.csv` が、春期 rank CSV の単純流用ではなく夏期用として扱われていること。
 - `ga4tag.txt` や計測IDなど、公開可否の確認が必要な値を含めていないこと。
 - `docs/CdG-Summer-Spec.md` と `docs/CdG-Summer-OpenQuestions-answer.txt` の用語が一致していること。
@@ -126,4 +125,4 @@ CdG-Summer-dev/
 
 現時点では、`SekieiJP/CdG-Summer-dev` には **ドキュメント中心の最小構成で開始** するのがよい。春期資産はローカル参照元として残し、夏期仕様に必要なファイルだけを段階的にコピーする。
 
-特に `game/`, `solver/`, `gas/` は春期色が強いため、初期公開から外す。夏期実装として再編した段階で、ファイル単位で追加する。
+現時点では、ルート `/` は `public/` のモック、`/game/` は夏期実装本体として公開する。`Spring-resource/` と開発補助ファイル群は引き続き非公開の参照資産として扱う。

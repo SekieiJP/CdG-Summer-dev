@@ -1,4 +1,4 @@
-name: Deploy Summer mockup to Pages
+name: Deploy Summer site to Pages
 
 on:
   # Runs on pushes targeting the default branch
@@ -34,10 +34,17 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Build Pages artifact
+        run: |
+          rm -rf _site
+          mkdir -p _site/game
+          cp -R public/. _site/
+          cp -R game/. _site/game/
+          touch _site/.nojekyll
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './public'
+          path: './_site'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
