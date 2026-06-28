@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:8000',
+    baseURL: 'http://localhost:8001',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -19,8 +19,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'python3 -m http.server 8000 --bind 127.0.0.1 --directory game',
-    url: 'http://localhost:8000',
+    command: 'python3 -m http.server 8001 --directory game',
+    url: 'http://localhost:8001',
     reuseExistingServer: true,
     timeout: 30 * 1000,
   },

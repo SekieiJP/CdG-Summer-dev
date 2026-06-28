@@ -15,6 +15,7 @@ import {
   formatDelta,
   getStaffKeysForCard,
   iconUrl,
+  normalizeCardNo,
   parseCsv,
   shuffle,
 } from './data.js';
@@ -28,6 +29,8 @@ const SUMMER_TOKEN_LABELS = {
   organize: '整理',
 };
 const SAVE_KEY = 'cdg_summer_state';
+const CALC_MODE_KEY = 'cdg_summer_calc_mode';
+const HIGHSCORE_KEY_PREFIX = 'cdg_summer_highscore_';
 const SAVE_VERSION = 1;
 
 function createMap(keys, factory) {
@@ -104,6 +107,23 @@ function formatScore(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function formatSignedScore(value) {
+  if (value > 0) {
+    return `+${value}`;
+  }
+  return String(value);
+}
+
+function normalizeSummerSelectionValue(value) {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'string');
+  }
+  if (typeof value === 'string' && value) {
+    return [value];
+  }
+  return [];
+}
+
 function loadText(path) {
   return fetch(path).then((response) => {
     if (!response.ok) {
@@ -129,6 +149,10 @@ export class SummerGameApp {
     this.startOverlayHidden = false;
     this.binded = false;
     this.statusAnimationTimer = null;
+    this.resultHighscore = null;
+    this.calcModeEnabled = false;
+    this.calcActionNAssignments = {};
+    this.calcSummerActionEntries = {};
   }
 
   createInitialState(difficulty) {
@@ -172,10 +196,10 @@ export class SummerGameApp {
       },
       summerMeetingOrganizeSelectionId: null,
       summerActionSelections: {
-        leader: null,
-        teacher: null,
-        office: null,
-        alba: null,
+        leader: [],
+        teacher: [],
+        office: [],
+        alba: [],
       },
       stats: { ...config.initialStats },
       lastDrawId: null,
@@ -190,6 +214,7 @@ export class SummerGameApp {
   async init() {
     this.cacheElements();
     this.bindEvents();
+    this.calcModeEnabled = this.readCalcModePreference();
     const savedState = this.readSavedGameState();
     const savedDifficulty = savedState?.state?.difficulty;
     const difficulty = DIFFICULTY_CONFIG[savedDifficulty] ? savedDifficulty : this.state.difficulty;
@@ -207,6 +232,7 @@ export class SummerGameApp {
       'title',
       'difficultyFresh',
       'difficultyPro',
+      'calcModeToggle',
       'startGame',
       'summaryToggle',
       'menuToggle',
@@ -229,10 +255,13 @@ export class SummerGameApp {
       'meetingSummary',
       'meetingChoices',
       'trainingChoices',
+      'trainingCalcCardInput',
+      'trainingCalcSubmit',
       'handGrid',
       'handGridAction',
       'staffGrid',
       'nPoolSummary',
+      'actionCalcPanel',
       'actionConfirm',
       'meetingConfirm',
       'resultSummary',
@@ -301,6 +330,9 @@ export class SummerGameApp {
 
     this.elements.difficultyFresh?.addEventListener('click', () => this.setDifficulty('fresh'));
     this.elements.difficultyPro?.addEventListener('click', () => this.setDifficulty('pro'));
+    this.elements.calcModeToggle?.addEventListener('change', (event) => {
+      this.setCalcModeEnabled(event.target.checked);
+    });
     this.elements.startGame?.addEventListener('click', () => this.startGame());
     this.elements.summaryToggle?.addEventListener('click', () => this.togglePhaseOverlay());
     this.elements.menuToggle?.addEventListener('click', () => this.toggleMenuOverlay());
@@ -437,6 +469,8 @@ export class SummerGameApp {
     this.state.summerMeetingSelectionId = null;
     this.state.summerMeetingOrganizeSelectionId = null;
     this.state.summerMeetingInspirationSelectionId = null;
+    this.calcActionNAssignments = {};
+    this.calcSummerActionEntries = {};
   }
 
   parseRankCsv(csvText) {
@@ -449,6 +483,10 @@ export class SummerGameApp {
       .filter((row) => row.some(Boolean))
       .map((row) => ({
         rank: readCell(row, 'ランク') ?? '',
+        experienceThreshold: readNumber(row, '体験基準'),
+        enrollmentThreshold: readNumber(row, '入塾基準'),
+        satisfactionThreshold: readNumber(row, '満足基準'),
+        accountingThreshold: readNumber(row, '経理基準'),
         thresholds: {
           experience: readNumber(row, '体験基準'),
           enrollment: readNumber(row, '入塾基準'),
@@ -478,6 +516,32 @@ export class SummerGameApp {
 
   showStartOverlay() {
     document.getElementById('startOverlay')?.classList.remove('hidden');
+  }
+
+  readCalcModePreference() {
+    try {
+      const raw = window.localStorage?.getItem(CALC_MODE_KEY);
+      return raw === '1' || raw === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  persistCalcModePreference() {
+    try {
+      window.localStorage?.setItem(CALC_MODE_KEY, this.calcModeEnabled ? '1' : '0');
+    } catch {
+      // 保存不能でもゲーム継続を優先する。
+    }
+  }
+
+  setCalcModeEnabled(enabled) {
+    this.calcModeEnabled = !!enabled;
+    if (this.elements.calcModeToggle) {
+      this.elements.calcModeToggle.checked = this.calcModeEnabled;
+    }
+    this.persistCalcModePreference();
+    this.render();
   }
 
   readSavedGameState() {
@@ -569,7 +633,10 @@ export class SummerGameApp {
       };
     });
     this.state.summerMeetingOrganizeSelectionId = state.summerMeetingOrganizeSelectionId ?? null;
-    this.state.summerActionSelections = createMap(SUMMER_STAFF_ORDER, (staffKey) => state.summerActionSelections?.[staffKey] ?? null);
+    this.state.summerActionSelections = createMap(
+      SUMMER_STAFF_ORDER,
+      (staffKey) => normalizeSummerSelectionValue(state.summerActionSelections?.[staffKey]),
+    );
     this.state.stats = isPlainObject(state.stats) ? { ...this.state.stats, ...state.stats } : this.state.stats;
     this.state.lastDrawId = state.lastDrawId ?? null;
     this.state.log = Array.isArray(state.log) ? cloneJson(state.log) : [];
@@ -641,6 +708,52 @@ export class SummerGameApp {
     }
   }
 
+  highscoreKeyFor(difficulty = this.state.difficulty) {
+    return `${HIGHSCORE_KEY_PREFIX}${difficulty}`;
+  }
+
+  readHighscore(difficulty = this.state.difficulty) {
+    try {
+      const raw = window.localStorage?.getItem(this.highscoreKeyFor(difficulty));
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      if (!isPlainObject(parsed) || typeof parsed.score !== 'number') {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  persistHighscore(result) {
+    if (!result || typeof result.score !== 'number') {
+      return null;
+    }
+
+    const previous = this.readHighscore(result.difficulty);
+    const shouldReplace = !previous
+      || result.score > previous.score
+      || (result.score === previous.score && result.turns < (previous.turns ?? Number.POSITIVE_INFINITY));
+    const next = shouldReplace ? result : previous;
+
+    if (shouldReplace) {
+      try {
+        window.localStorage?.setItem(this.highscoreKeyFor(result.difficulty), JSON.stringify(next));
+      } catch {
+        // 保存不能でも表示は続行する。
+      }
+    }
+
+    return {
+      previous,
+      current: next,
+      isNew: shouldReplace,
+    };
+  }
+
   startGame() {
     this.startOverlayHidden = true;
     this.hideStartOverlay();
@@ -682,9 +795,251 @@ export class SummerGameApp {
   }
 
   createEmptySummerActionSelections() {
-    return createMap(SUMMER_STAFF_ORDER, () => null);
+    return createMap(SUMMER_STAFF_ORDER, () => []);
   }
 
+  getSummerActionSelectionIds(staffKey) {
+    return normalizeSummerSelectionValue(this.state.summerActionSelections?.[staffKey]);
+  }
+
+  cardHasParallelEffect(card) {
+    return /並行|🤹/.test(`${card?.topEffect ?? ''} ${card?.effect ?? ''}`);
+  }
+
+  isCalcNormalActionMode() {
+    return this.calcModeEnabled && this.state.phase === 'action' && this.currentTurnConfig()?.season === '通常期';
+  }
+
+  isCalcSummerPrepMode() {
+    return this.calcModeEnabled && this.state.phase === 'summer-prep' && this.currentTurnConfig()?.season === '講習期';
+  }
+
+  isCalcSummerActionMode() {
+    return this.calcModeEnabled && this.state.phase === 'summer-action' && this.currentTurnConfig()?.season === '講習期';
+  }
+
+  isCalcSummerMeetingMode() {
+    return this.calcModeEnabled && this.state.phase === 'summer-meeting' && this.currentTurnConfig()?.season === '講習期';
+  }
+
+  setCalcActionNAssignment(staffKey, cardNo) {
+    if (!NORMAL_STAFF_ORDER.includes(staffKey)) {
+      return;
+    }
+    this.calcActionNAssignments[staffKey] = String(cardNo ?? '').trim();
+  }
+
+  getCalcActionNAssignment(staffKey) {
+    return String(this.calcActionNAssignments?.[staffKey] ?? '').trim();
+  }
+
+  setCalcSummerActionEntry(staffKey, value) {
+    if (!SUMMER_STAFF_ORDER.includes(staffKey)) {
+      return;
+    }
+    this.calcSummerActionEntries[staffKey] = String(value ?? '');
+  }
+
+  getCalcSummerActionEntry(staffKey) {
+    return String(this.calcSummerActionEntries?.[staffKey] ?? '');
+  }
+
+  findCardInListByNo(cards, cardNo) {
+    const normalized = normalizeCardNo(cardNo);
+    if (!normalized) {
+      return null;
+    }
+    const index = cards.findIndex((card) => normalizeCardNo(card.cardNo) === normalized);
+    if (index < 0) {
+      return null;
+    }
+    return {
+      normalized,
+      index,
+      card: cards[index],
+    };
+  }
+
+  findSummerPrepEligibleTargets(candidate) {
+    if (!candidate) {
+      return [];
+    }
+    return SUMMER_STAFF_ORDER.flatMap((staffKey) => (
+      (this.state.staffDecks?.[staffKey] ?? [])
+        .map((card, index) => ({ card, staffKey, targetIndex: index }))
+        .filter((entry) => rarityRank(entry.card.rarity) <= rarityRank(candidate.rarity))
+    ));
+  }
+
+  resolveSummerPrepCandidateSelection(cardNo) {
+    if (!this.pendingSummerPrep) {
+      return null;
+    }
+    const raw = String(cardNo ?? '').trim();
+    if (raw) {
+      const matched = this.findCardInListByNo(this.pendingSummerPrep.candidates, raw);
+      if (!matched) {
+        const normalized = normalizeCardNo(raw);
+        const target = normalized ?? raw ?? '(空欄)';
+        this.log(`計算機モード: トップ3枚候補にカード番号 ${target} は存在しません`, 'error');
+        return null;
+      }
+      return matched.card;
+    }
+    if (!this.pendingSummerPrep.selectedCandidateId) {
+      this.log('計算機モード: トップ3枚候補からカード番号を入力してください', 'error');
+      return null;
+    }
+    const selected = this.pendingSummerPrep.candidates.find((card) => card.instanceId === this.pendingSummerPrep.selectedCandidateId);
+    if (!selected) {
+      this.log('計算機モード: 選択中の候補カードを解決できませんでした', 'error');
+      return null;
+    }
+    return selected;
+  }
+
+  submitCalcSummerPrepExchange() {
+    if (!this.isCalcSummerPrepMode() || !this.pendingSummerPrep) {
+      return;
+    }
+    const candidateInput = this.elements.summerCandidateArea?.querySelector('#summerPrepCalcCandidateInput');
+    const staffSelect = this.elements.summerCandidateArea?.querySelector('#summerPrepCalcStaffSelect');
+    const slotInput = this.elements.summerCandidateArea?.querySelector('#summerPrepCalcSlotInput');
+    const candidate = this.resolveSummerPrepCandidateSelection(candidateInput?.value ?? '');
+    if (!candidate) {
+      return;
+    }
+
+    const eligibleTargets = this.findSummerPrepEligibleTargets(candidate);
+    if (eligibleTargets.length === 0) {
+      this.log('計算機モード: 交換可能なカードがないため「交換せず除外」だけ選べます', 'error');
+      return;
+    }
+
+    const staffKey = String(staffSelect?.value ?? '').trim();
+    if (!SUMMER_STAFF_ORDER.includes(staffKey)) {
+      this.log(`計算機モード: 交換先スタッフ ${staffKey || '(空欄)'} は無効です`, 'error');
+      return;
+    }
+
+    const rawSlot = String(slotInput?.value ?? '').trim();
+    const slotNumber = Number(rawSlot);
+    if (!Number.isInteger(slotNumber) || slotNumber <= 0) {
+      this.log('計算機モード: 交換先カード位置は 1 以上の整数で入力してください', 'error');
+      return;
+    }
+    const targetIndex = slotNumber - 1;
+    const targetCard = this.state.staffDecks?.[staffKey]?.[targetIndex];
+    if (!targetCard) {
+      this.log(`計算機モード: ${this.getStaffLabel(staffKey)} のカード位置 ${slotNumber} にはカードがありません`, 'error');
+      return;
+    }
+    if (rarityRank(targetCard.rarity) > rarityRank(candidate.rarity)) {
+      this.log('計算機モード: 交換先カードは同レアリティ以下のみ指定できます', 'error');
+      return;
+    }
+
+    this.pendingSummerPrep.selectedCandidateId = candidate.instanceId;
+    this.finalizeSummerPrepSelection({ staffKey, targetIndex, discardOnly: false });
+  }
+
+  findSummerMeetingCandidateByNo(candidates, cardNo, missingMessage, duplicateMessage) {
+    const normalized = normalizeCardNo(cardNo);
+    if (!normalized) {
+      this.log(missingMessage.replace('{cardNo}', '(空欄)'), 'error');
+      return null;
+    }
+    const matches = candidates.filter((item) => normalizeCardNo(item.card.cardNo) === normalized);
+    if (matches.length === 0) {
+      this.log(missingMessage.replace('{cardNo}', normalized), 'error');
+      return null;
+    }
+    if (matches.length > 1) {
+      this.log(duplicateMessage.replace('{cardNo}', normalized), 'error');
+      return null;
+    }
+    return matches[0];
+  }
+
+  submitCalcSummerMeetingRevival() {
+    if (!this.isCalcSummerMeetingMode()) {
+      return;
+    }
+    const input = this.elements.summerMeetingRevivalPanel?.querySelector('#summerMeetingRevivalCalcCardInput');
+    const candidate = this.findSummerMeetingCandidateByNo(
+      this.getSummerMeetingRevivalCandidates(),
+      input?.value ?? '',
+      '計算機モード: 復活可能カードにカード番号 {cardNo} は存在しません',
+      '計算機モード: 復活可能カードにカード番号 {cardNo} が複数あります',
+    );
+    if (!candidate) {
+      return;
+    }
+    this.state.summerMeetingSelectionId = candidate.card.instanceId;
+    this.useSummerMeetingPassionRevival();
+  }
+
+  submitCalcSummerMeetingInspiration() {
+    if (!this.isCalcSummerMeetingMode()) {
+      return;
+    }
+    const panel = this.elements.summerMeetingInspirationPanel;
+    const poolType = String(panel?.querySelector('#summerMeetingInspirationCalcPoolSelect')?.value ?? '').trim();
+    const category = String(panel?.querySelector('#summerMeetingInspirationCalcCategorySelect')?.value ?? '').trim();
+    const candidateNo = panel?.querySelector('#summerMeetingInspirationCalcCardInput')?.value ?? '';
+    const staffKey = String(panel?.querySelector('#summerMeetingInspirationCalcStaffSelect')?.value ?? '').trim();
+
+    if (!['地域', '全校'].includes(poolType) || !TRAINING_CATEGORIES.includes(category)) {
+      this.log('計算機モード: 発想追加の山札を正しく選択してください', 'error');
+      return;
+    }
+    if (!SUMMER_STAFF_ORDER.includes(staffKey)) {
+      this.log(`計算機モード: 追加先スタッフ ${staffKey || '(空欄)'} は無効です`, 'error');
+      return;
+    }
+
+    if (!this.pendingSummerInspiration) {
+      this.startSummerMeetingInspirationSelection(poolType, category);
+      if (!this.pendingSummerInspiration) {
+        return;
+      }
+    } else if (this.pendingSummerInspiration.poolType !== poolType || this.pendingSummerInspiration.category !== category) {
+      this.log('先に選択中の発想カードを確定してください', 'error');
+      return;
+    }
+
+    const candidate = this.findSummerMeetingCandidateByNo(
+      this.pendingSummerInspiration.candidates.map((card) => ({ card })),
+      candidateNo,
+      '計算機モード: トップ3枚候補にカード番号 {cardNo} は存在しません',
+      '計算機モード: トップ3枚候補にカード番号 {cardNo} が複数あります',
+    );
+    if (!candidate) {
+      return;
+    }
+
+    this.pendingSummerInspiration.selectedCandidateId = candidate.card.instanceId;
+    this.state.summerMeetingInspirationSelectionId = candidate.card.instanceId;
+    this.finalizeSummerMeetingInspirationSelection(staffKey);
+  }
+
+  submitCalcSummerMeetingOrganize() {
+    if (!this.isCalcSummerMeetingMode()) {
+      return;
+    }
+    const input = this.elements.summerMeetingOrganizePanel?.querySelector('#summerMeetingOrganizeCalcCardInput');
+    const candidate = this.findSummerMeetingCandidateByNo(
+      this.getSummerMeetingOrganizeCandidates(),
+      input?.value ?? '',
+      '計算機モード: スタッフ別デッキにカード番号 {cardNo} は存在しません',
+      '計算機モード: スタッフ別デッキにカード番号 {cardNo} が複数あります',
+    );
+    if (!candidate) {
+      return;
+    }
+    this.state.summerMeetingOrganizeSelectionId = candidate.card.instanceId;
+    this.useSummerMeetingOrganizeRemoval();
+  }
   createEmptySummerFlipMap() {
     return createMap(SUMMER_STAFF_ORDER, () => new Set());
   }
@@ -717,6 +1072,8 @@ export class SummerGameApp {
       this.state.hand = [];
       this.state.assignments = {};
       this.state.lastDrawId = null;
+      this.calcActionNAssignments = {};
+      this.calcSummerActionEntries = {};
       return;
     }
 
@@ -726,6 +1083,7 @@ export class SummerGameApp {
       this.state.summerPrepCompleted = 0;
       this.state.summerActionSelections = this.createEmptySummerActionSelections();
       this.state.staffRestActivity = this.createEmptySummerRestMap();
+      this.calcSummerActionEntries = {};
       return;
     }
 
@@ -737,6 +1095,7 @@ export class SummerGameApp {
       this.pendingSummerInspiration = null;
       this.state.summerActionSelections = this.createEmptySummerActionSelections();
       this.state.staffRestActivity = this.createEmptySummerRestMap();
+      this.calcSummerActionEntries = {};
       return;
     }
 
@@ -866,6 +1225,59 @@ export class SummerGameApp {
     this.render();
   }
 
+  findTrainingCardByNo(cardNo) {
+    const normalized = normalizeCardNo(cardNo);
+    if (!normalized) {
+      return null;
+    }
+    const turn = this.currentTurnConfig();
+    if (!turn) {
+      return null;
+    }
+    const poolType = turn.poolType;
+    for (const category of TRAINING_CATEGORIES) {
+      const deck = this.trainingPools?.[poolType]?.[category] ?? [];
+      const deckIndex = deck.findIndex((card) => normalizeCardNo(card.cardNo) === normalized);
+      if (deckIndex >= 0) {
+        return { normalized, poolType, category, bucket: deck, index: deckIndex };
+      }
+      const discard = this.trainingDiscards?.[poolType]?.[category] ?? [];
+      const discardIndex = discard.findIndex((card) => normalizeCardNo(card.cardNo) === normalized);
+      if (discardIndex >= 0) {
+        return { normalized, poolType, category, bucket: discard, index: discardIndex };
+      }
+    }
+    return null;
+  }
+
+  drawTrainingCardByCardNo(cardNo) {
+    if (this.state.phase !== 'training' || this.state.trainingDrawsLeft <= 0) {
+      return;
+    }
+    const matched = this.findTrainingCardByNo(cardNo);
+    const turn = this.currentTurnConfig();
+    if (!matched) {
+      const normalized = normalizeCardNo(cardNo);
+      const target = normalized ?? (String(cardNo ?? '').trim() || '(空欄)');
+      this.log(`計算機モード: ${turn?.poolType ?? '-'}プールにカード番号 ${target} は存在しません`, 'error');
+      return;
+    }
+    const [card] = matched.bucket.splice(matched.index, 1);
+    if (!card) {
+      this.log(`計算機モード: カード番号 ${matched.normalized} の取得に失敗しました`, 'error');
+      return;
+    }
+    const drawn = cloneCardWithId(card, `turn${turn.turn}`);
+    this.state.hand.push(drawn);
+    this.state.lastDrawId = drawn.instanceId;
+    this.state.trainingDrawsLeft -= 1;
+    this.log(`研修で ${drawn.cardName} を獲得しました`);
+    if (this.state.trainingDrawsLeft === 0) {
+      this.state.phase = 'action';
+    }
+    this.render();
+  }
+
   selectedAssignment(handIndex) {
     return this.state.assignments[handIndex] ?? '';
   }
@@ -899,22 +1311,13 @@ export class SummerGameApp {
     return true;
   }
 
-  resolveActionPhase() {
-    if (this.state.phase !== 'action') {
-      return;
-    }
+  collectStandardActionAssignments() {
     if (!this.assignmentsAreUnique()) {
       this.log('同じスタッフに複数カードは割り当てられません', 'error');
-      return;
+      return null;
     }
 
-    const resolution = [];
-    const usedStaff = new Set();
-    const statsBefore = { ...this.state.stats };
-    let nextStats = { ...this.state.stats };
-    let nextTokens = this.state.tokens ? { ...this.state.tokens } : this.state.tokens;
     const validAssignments = {};
-
     for (const [indexText, staffKey] of Object.entries(this.state.assignments)) {
       const index = Number(indexText);
       const card = this.state.hand[index];
@@ -923,12 +1326,94 @@ export class SummerGameApp {
       }
       if (!this.allowedStaffForCard(card).includes(staffKey)) {
         this.log(`${card.cardName} は ${this.getStaffLabel(staffKey)} に置けません`, 'error');
-        return;
+        return null;
       }
       validAssignments[index] = staffKey;
     }
 
-    this.state.assignments = validAssignments;
+    return { validAssignments, explicitNSelections: {} };
+  }
+
+  collectCalcActionAssignments() {
+    const validAssignments = {};
+    const perStaff = createMap(NORMAL_STAFF_ORDER, () => []);
+
+    for (const [indexText, staffKey] of Object.entries(this.state.assignments)) {
+      const index = Number(indexText);
+      if (!staffKey) {
+        continue;
+      }
+      const card = this.state.hand[index];
+      if (!card) {
+        this.log(`計算機モード: 手札${index + 1} にカードがありません`, 'error');
+        return null;
+      }
+      if (!NORMAL_STAFF_ORDER.includes(staffKey)) {
+        this.log(`計算機モード: 手札${index + 1} の配置先 ${staffKey} は無効です`, 'error');
+        return null;
+      }
+      if (!this.allowedStaffForCard(card).includes(staffKey)) {
+        this.log(`${card.cardName} は ${this.getStaffLabel(staffKey)} に置けません`, 'error');
+        return null;
+      }
+      validAssignments[index] = staffKey;
+      perStaff[staffKey].push({ card });
+    }
+
+    for (const staffKey of NORMAL_STAFF_ORDER) {
+      const entries = perStaff[staffKey];
+      if (entries.length <= 1) {
+        continue;
+      }
+      const invalidExtra = entries.slice(1).find((entry) => !this.cardHasParallelEffect(entry.card));
+      if (invalidExtra) {
+        this.log(`${this.getStaffLabel(staffKey)} に追加配置できるのは並行カードのみです`, 'error');
+        return null;
+      }
+    }
+
+    const usedStaff = new Set(Object.values(validAssignments));
+    const remainingStaff = NORMAL_STAFF_ORDER.filter((key) => !usedStaff.has(key));
+    const nTargets = remainingStaff.slice(0, this.nPool.length);
+    const explicitNSelections = {};
+    const remainingNPool = [...this.nPool];
+    for (const staffKey of nTargets) {
+      const raw = this.getCalcActionNAssignment(staffKey);
+      if (!raw) {
+        this.log(`計算機モード: ${this.getStaffLabel(staffKey)} に使う Nカード番号を入力してください`, 'error');
+        return null;
+      }
+      const matched = this.findCardInListByNo(remainingNPool, raw);
+      const normalized = normalizeCardNo(raw);
+      const target = normalized ?? (String(raw).trim() || '(空欄)');
+      if (!matched) {
+        this.log(`計算機モード: Nプールにカード番号 ${target} は存在しません`, 'error');
+        return null;
+      }
+      remainingNPool.splice(matched.index, 1);
+      explicitNSelections[staffKey] = matched.normalized;
+    }
+
+    return { validAssignments, explicitNSelections };
+  }
+
+  resolveActionPhase() {
+    if (this.state.phase !== 'action') {
+      return;
+    }
+    const actionPlan = this.isCalcNormalActionMode()
+      ? this.collectCalcActionAssignments()
+      : this.collectStandardActionAssignments();
+    if (!actionPlan) {
+      return;
+    }
+
+    const resolution = [];
+    const usedStaff = new Set();
+    const statsBefore = { ...this.state.stats };
+    let nextStats = { ...this.state.stats };
+    let nextTokens = this.state.tokens ? { ...this.state.tokens } : this.state.tokens;
+    this.state.assignments = actionPlan.validAssignments;
 
     this.state.hand.forEach((card, index) => {
       const staffKey = this.state.assignments[index];
@@ -954,7 +1439,17 @@ export class SummerGameApp {
         resolution.push({ type: 'n-missing', staffKey });
         continue;
       }
-      const card = this.nPool.shift();
+      let card = null;
+      if (this.isCalcNormalActionMode()) {
+        const matched = this.findCardInListByNo(this.nPool, actionPlan.explicitNSelections[staffKey]);
+        if (!matched) {
+          this.log(`計算機モード: ${this.getStaffLabel(staffKey)} に指定した Nカードを解決できませんでした`, 'error');
+          return;
+        }
+        [card] = this.nPool.splice(matched.index, 1);
+      } else {
+        card = this.nPool.shift();
+      }
       const applied = this.applyCard(card, staffKey, nextStats, '通常期', nextTokens);
       nextStats = applied.stats;
       nextTokens = applied.tokens;
@@ -1062,6 +1557,14 @@ export class SummerGameApp {
     if (this.state.phase !== 'summer-prep' || !this.pendingSummerPrep) {
       return;
     }
+    if (this.isCalcSummerPrepMode()) {
+      const candidateInput = this.elements.summerCandidateArea?.querySelector('#summerPrepCalcCandidateInput');
+      const candidate = this.resolveSummerPrepCandidateSelection(candidateInput?.value ?? '');
+      if (!candidate) {
+        return;
+      }
+      this.pendingSummerPrep.selectedCandidateId = candidate.instanceId;
+    }
     if (!this.pendingSummerPrep.selectedCandidateId) {
       this.log('交換する候補カードを先に選んでください', 'error');
       return;
@@ -1149,7 +1652,17 @@ export class SummerGameApp {
     if (!card || this.isSummerCardFlipped(staffKey, card)) {
       return;
     }
-    this.state.summerActionSelections[staffKey] = cardId;
+    const selectedIds = this.getSummerActionSelectionIds(staffKey);
+    if (selectedIds.includes(cardId)) {
+      this.state.summerActionSelections[staffKey] = selectedIds.filter((id) => id !== cardId);
+      this.render();
+      return;
+    }
+    if (selectedIds.length > 0 && !this.cardHasParallelEffect(card)) {
+      this.log('追加配置できるのは並行カードのみです', 'error');
+      return;
+    }
+    this.state.summerActionSelections[staffKey] = [...selectedIds, cardId];
     this.render();
   }
 
@@ -1157,7 +1670,10 @@ export class SummerGameApp {
     if (this.state.phase !== 'summer-action' || !SUMMER_STAFF_ORDER.includes(staffKey)) {
       return;
     }
-    this.state.summerActionSelections[staffKey] = null;
+    this.state.summerActionSelections[staffKey] = [];
+    if (this.isCalcSummerActionMode()) {
+      this.setCalcSummerActionEntry(staffKey, '休む');
+    }
     this.render();
   }
 
@@ -1165,9 +1681,72 @@ export class SummerGameApp {
     return !!card?.instanceId && this.state.staffFlipped?.[staffKey]?.has(card.instanceId);
   }
 
+  collectCalcSummerActionSelections() {
+    const selections = this.createEmptySummerActionSelections();
+
+    for (const staffKey of SUMMER_STAFF_ORDER) {
+      const raw = this.getCalcSummerActionEntry(staffKey).trim();
+      if (!raw) {
+        this.log(`計算機モード: ${this.getStaffLabel(staffKey)} は「休む」または使うカード番号を入力してください`, 'error');
+        return null;
+      }
+      if (raw === '休む') {
+        selections[staffKey] = [];
+        continue;
+      }
+
+      const numbers = raw
+        .split(/[,\s、]+/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (numbers.length === 0) {
+        this.log(`計算機モード: ${this.getStaffLabel(staffKey)} は「休む」または使うカード番号を入力してください`, 'error');
+        return null;
+      }
+
+      const usedIds = [];
+      const seenIds = new Set();
+      for (let index = 0; index < numbers.length; index += 1) {
+        const cardNo = numbers[index];
+        const matched = this.findCardInListByNo(this.state.staffDecks?.[staffKey] ?? [], cardNo);
+        const normalized = normalizeCardNo(cardNo) ?? cardNo;
+        if (!matched) {
+          this.log(`計算機モード: ${this.getStaffLabel(staffKey)} デッキにカード番号 ${normalized} は存在しません`, 'error');
+          return null;
+        }
+        if (this.isSummerCardFlipped(staffKey, matched.card)) {
+          this.log(`計算機モード: ${this.getStaffLabel(staffKey)}のカード番号 ${matched.normalized} は裏返しのため使えません`, 'error');
+          return null;
+        }
+        if (seenIds.has(matched.card.instanceId)) {
+          this.log(`計算機モード: ${this.getStaffLabel(staffKey)} のカード番号 ${matched.normalized} が重複しています`, 'error');
+          return null;
+        }
+        if (index >= 1 && !this.cardHasParallelEffect(matched.card)) {
+          this.log(`計算機モード: ${this.getStaffLabel(staffKey)} に追加使用できるのは並行カードのみです`, 'error');
+          return null;
+        }
+        seenIds.add(matched.card.instanceId);
+        usedIds.push(matched.card.instanceId);
+      }
+
+      selections[staffKey] = usedIds;
+    }
+
+    return selections;
+  }
+
   resolveSummerActionPhase() {
     if (this.state.phase !== 'summer-action') {
       return;
+    }
+
+    if (this.isCalcSummerActionMode()) {
+      const selections = this.collectCalcSummerActionSelections();
+      if (!selections) {
+        return;
+      }
+      this.state.summerActionSelections = selections;
     }
 
     const statsBefore = { ...this.state.stats };
@@ -1178,21 +1757,25 @@ export class SummerGameApp {
     const restMap = createMap(SUMMER_STAFF_ORDER, () => false);
 
     for (const staffKey of SUMMER_STAFF_ORDER) {
-      const cardId = this.state.summerActionSelections[staffKey];
-      const card = cardId ? this.state.staffDecks[staffKey].find((item) => item.instanceId === cardId) : null;
-      if (!card) {
+      const selectedIds = this.getSummerActionSelectionIds(staffKey);
+      const cards = selectedIds
+        .map((cardId) => this.state.staffDecks[staffKey].find((item) => item.instanceId === cardId))
+        .filter(Boolean);
+      if (cards.length === 0) {
         restMap[staffKey] = false;
         continue;
       }
 
       restMap[staffKey] = true;
-      const applied = this.applyCard(card, staffKey, nextStats, '講習期', nextTokens);
-      nextStats = applied.stats;
-      nextTokens = applied.tokens;
-      usedCards.push({ staffKey, card, details: applied.details });
-      resolution.push({ type: 'summer-used', staffKey, card, details: applied.details });
-      if (card.rarity === 'SR' || card.rarity === 'SSR') {
-        this.state.staffFlipped[staffKey].add(card.instanceId);
+      for (const card of cards) {
+        const applied = this.applyCard(card, staffKey, nextStats, '講習期', nextTokens);
+        nextStats = applied.stats;
+        nextTokens = applied.tokens;
+        usedCards.push({ staffKey, card, details: applied.details });
+        resolution.push({ type: 'summer-used', staffKey, card, details: applied.details });
+        if (card.rarity === 'SR' || card.rarity === 'SSR') {
+          this.state.staffFlipped[staffKey].add(card.instanceId);
+        }
       }
     }
 
@@ -1432,6 +2015,125 @@ export class SummerGameApp {
     };
   }
 
+  findThresholdScore({ value, thresholdKey, scoreKey, direction = 'gte' }) {
+    let matchedScore = 0;
+    for (const row of this.rankRows) {
+      const threshold = row[thresholdKey];
+      const score = row.scores?.[scoreKey];
+      if (threshold === null || threshold === undefined || score === null || score === undefined) {
+        continue;
+      }
+      const matched = direction === 'lte' ? value <= threshold : value >= threshold;
+      if (matched) {
+        matchedScore = score;
+      }
+    }
+    return matchedScore;
+  }
+
+  calculateProResult() {
+    const experience = this.state.stats.experience ?? 0;
+    const enrollment = this.state.stats.enrollment ?? 0;
+    const satisfaction = this.state.stats.satisfaction ?? 0;
+    const accounting = this.state.stats.accounting ?? 0;
+    const withdrawal = Math.max(0, 15 - satisfaction) + Math.max(0, 15 - accounting);
+    const enrollmentDiff = enrollment - withdrawal;
+    const mobilizationPoints = this.findThresholdScore({
+      value: experience,
+      thresholdKey: 'experienceThreshold',
+      scoreKey: 'mobilization',
+      direction: 'gte',
+    });
+    const withdrawalPoints = this.findThresholdScore({
+      value: withdrawal,
+      thresholdKey: 'withdrawalThreshold',
+      scoreKey: 'withdrawal',
+      direction: 'lte',
+    });
+    const enrollmentDiffPoints = this.findThresholdScore({
+      value: enrollmentDiff,
+      thresholdKey: 'enrollmentDiffThreshold',
+      scoreKey: 'enrollmentDiff',
+      direction: 'gte',
+    });
+    const satisfactionPoints = this.findThresholdScore({
+      value: satisfaction,
+      thresholdKey: 'satisfactionThreshold',
+      scoreKey: 'satisfaction',
+      direction: 'gte',
+    });
+    const total = mobilizationPoints + withdrawalPoints + enrollmentDiffPoints + satisfactionPoints;
+
+    let overallRow = this.rankRows[0] ?? { rank: '-', title: '', rankThreshold: Number.NEGATIVE_INFINITY };
+    for (const row of this.rankRows) {
+      const threshold = row.rankThreshold;
+      if (threshold === null || threshold === undefined) {
+        continue;
+      }
+      if (total >= threshold) {
+        overallRow = row;
+      }
+    }
+
+    return {
+      withdrawal,
+      enrollmentDiff,
+      mobilizationPoints,
+      withdrawalPoints,
+      enrollmentDiffPoints,
+      satisfactionPoints,
+      total,
+      overallRank: overallRow.rank ?? '-',
+      title: overallRow.title ?? '',
+    };
+  }
+
+  buildResultSnapshot() {
+    if (this.state.difficulty === 'fresh') {
+      const freshResult = this.calculateFreshResult();
+      return {
+        difficulty: 'fresh',
+        rank: freshResult.overallRank,
+        score: freshResult.displayScore,
+        turns: this.state.usedTurns.length,
+      };
+    }
+
+    const proResult = this.calculateProResult();
+    return {
+      difficulty: 'pro',
+      rank: proResult.overallRank,
+      score: proResult.total,
+      title: proResult.title,
+      turns: this.state.usedTurns.length,
+    };
+  }
+
+  syncResultHighscore() {
+    if (this.state.phase !== 'result') {
+      this.resultHighscore = null;
+      return;
+    }
+    this.resultHighscore = this.persistHighscore(this.buildResultSnapshot());
+  }
+
+  buildHighscoreResultItem() {
+    const best = this.resultHighscore?.current;
+    if (!best) {
+      return '';
+    }
+
+    const label = this.resultHighscore?.isNew ? 'ハイスコア更新' : '自己ベスト';
+    const titleText = best.title ? ` / ${escapeHtml(best.title)}` : '';
+    return `
+      <li class="result-item result-item-accent">
+        <span class="result-label">${label}</span>
+        <span class="result-value">${formatScore(best.score)}</span>
+        <span class="result-rank">${best.rank}${titleText}</span>
+      </li>
+    `;
+  }
+
   renderFreshResult() {
     const freshResult = this.calculateFreshResult();
     this.elements.resultRank.innerHTML = `
@@ -1471,21 +2173,21 @@ export class SummerGameApp {
       `
         <li class="result-item">
           <span class="result-label">退塾点</span>
-          <span class="result-value">${freshResult.withdrawalPoints > 0 ? `+${freshResult.withdrawalPoints}` : freshResult.withdrawalPoints}</span>
+          <span class="result-value">${formatSignedScore(freshResult.withdrawalPoints)}</span>
           <span class="result-rank">退塾 ${freshResult.withdrawal}</span>
         </li>
       `,
       `
         <li class="result-item">
           <span class="result-label">動員点</span>
-          <span class="result-value">${freshResult.mobilizationPoints > 0 ? `+${freshResult.mobilizationPoints}` : freshResult.mobilizationPoints}</span>
+          <span class="result-value">${formatSignedScore(freshResult.mobilizationPoints)}</span>
           <span class="result-rank">体験 ${this.state.stats.experience ?? 0}</span>
         </li>
       `,
       `
         <li class="result-item">
           <span class="result-label">入退差点</span>
-          <span class="result-value">${freshResult.enrollmentDiffPoints > 0 ? `+${freshResult.enrollmentDiffPoints}` : freshResult.enrollmentDiffPoints}</span>
+          <span class="result-value">${formatSignedScore(freshResult.enrollmentDiffPoints)}</span>
           <span class="result-rank">入退差 ${freshResult.enrollmentDiff}</span>
         </li>
       `,
@@ -1498,6 +2200,90 @@ export class SummerGameApp {
             : `総合ランク ${freshResult.overallRank}`}</span>
         </li>
       `,
+      this.buildHighscoreResultItem(),
+    ].join('');
+  }
+
+  renderProResult() {
+    const proResult = this.calculateProResult();
+    const rankClass = String(proResult.overallRank ?? '').replace(/\+/g, 'plus');
+    this.elements.resultRank.innerHTML = `
+      <span class="result-rank-label">総合ランク</span>
+      <span class="result-rank-badge rank-${rankClass}">${proResult.overallRank}</span>
+    `;
+    this.elements.resultTurn.innerHTML = `
+      <span>合計 ${proResult.total}</span>
+      <span>称号 ${escapeHtml(proResult.title || '-')}</span>
+      <span>${this.state.usedTurns.length}ターン完了</span>
+    `;
+    this.elements.resultSummary.innerHTML = [
+      ...STAT_KEYS.map((item) => {
+        const { current } = this.currentRankFor(item.key);
+        return `
+          <li class="result-item">
+            <span class="result-label">${item.label}</span>
+            <span class="result-value">${this.state.stats[item.key] ?? 0}</span>
+            <span class="result-rank">${current.rank}</span>
+          </li>
+        `;
+      }),
+      `
+        <li class="result-item">
+          <span class="result-label">退塾</span>
+          <span class="result-value">${proResult.withdrawal}</span>
+          <span class="result-rank">max(0,15-満足)+max(0,15-経理)</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">入退差</span>
+          <span class="result-value">${proResult.enrollmentDiff}</span>
+          <span class="result-rank">入塾-退塾</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">動員点</span>
+          <span class="result-value">${formatSignedScore(proResult.mobilizationPoints)}</span>
+          <span class="result-rank">体験 ${this.state.stats.experience ?? 0}</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">退塾点</span>
+          <span class="result-value">${formatSignedScore(proResult.withdrawalPoints)}</span>
+          <span class="result-rank">退塾 ${proResult.withdrawal}</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">入退差点</span>
+          <span class="result-value">${formatSignedScore(proResult.enrollmentDiffPoints)}</span>
+          <span class="result-rank">入退差 ${proResult.enrollmentDiff}</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">満足点</span>
+          <span class="result-value">${formatSignedScore(proResult.satisfactionPoints)}</span>
+          <span class="result-rank">満足 ${this.state.stats.satisfaction ?? 0}</span>
+        </li>
+      `,
+      `
+        <li class="result-item result-item-accent">
+          <span class="result-label">合計</span>
+          <span class="result-value">${proResult.total}</span>
+          <span class="result-rank">総合ランク ${proResult.overallRank}</span>
+        </li>
+      `,
+      `
+        <li class="result-item">
+          <span class="result-label">称号</span>
+          <span class="result-value">${escapeHtml(proResult.title || '-')}</span>
+          <span class="result-rank">rankSummerPro.csv</span>
+        </li>
+      `,
+      this.buildHighscoreResultItem(),
     ].join('');
   }
 
@@ -1518,6 +2304,7 @@ export class SummerGameApp {
     this.renderHandGrid();
     this.renderStaffGrid();
     this.renderTrainingChoices();
+    this.renderActionCalcPanel();
     this.updateActionConfirmState();
     this.renderLogMessages();
     this.persistGameState();
@@ -1527,6 +2314,9 @@ export class SummerGameApp {
     const isFresh = this.state.difficulty === 'fresh';
     this.elements.difficultyFresh?.classList.toggle('selected', isFresh);
     this.elements.difficultyPro?.classList.toggle('selected', !isFresh);
+    if (this.elements.calcModeToggle) {
+      this.elements.calcModeToggle.checked = this.calcModeEnabled;
+    }
   }
 
   renderTurnPill() {
@@ -1665,6 +2455,48 @@ export class SummerGameApp {
       return;
     }
     const turn = this.currentTurnConfig();
+    if (this.calcModeEnabled) {
+      const totalCards = TRAINING_CATEGORIES.reduce(
+        (sum, category) => sum + this.getTrainingPoolAvailableCount(turn.poolType, category),
+        0,
+      );
+      this.elements.trainingChoices.innerHTML = `
+        <div class="calc-action-inputs">
+          <div class="calc-input-group">
+            <div class="calc-slot-row">
+              <label for="trainingCalcCardInput">カード番号</label>
+              <input
+                id="trainingCalcCardInput"
+                class="calc-card-input"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                placeholder="例: 6"
+                autocomplete="off"
+              >
+            </div>
+            <div class="calc-preview">
+              <div class="calc-preview-card"><span>対象プール</span><br>${turn.poolType} / 残り ${totalCards} 枚</div>
+            </div>
+            <button id="trainingCalcSubmit" class="btn-primary" type="button">カードを獲得</button>
+          </div>
+        </div>
+      `;
+      const input = this.elements.trainingChoices.querySelector('#trainingCalcCardInput');
+      const submit = this.elements.trainingChoices.querySelector('#trainingCalcSubmit');
+      if (submit) {
+        submit.addEventListener('click', () => this.drawTrainingCardByCardNo(input?.value ?? ''));
+      }
+      if (input) {
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            this.drawTrainingCardByCardNo(input.value);
+          }
+        });
+      }
+      return;
+    }
     const pool = this.trainingPools?.[turn.poolType] ?? {};
     this.elements.trainingChoices.innerHTML = TRAINING_CATEGORIES.map((category) => {
       const count = pool[category]?.length ?? 0;
@@ -1772,14 +2604,100 @@ export class SummerGameApp {
       return;
     }
     const remaining = this.nPool.length;
+    const calcNote = this.isCalcNormalActionMode()
+      ? '未割当スタッフへ番号指定で補完'
+      : '未割当スタッフへ自動補完';
     this.elements.nPoolSummary.innerHTML = `
       <span class="token-chip token-organize">Nプール ${remaining}枚</span>
-      <span class="token-chip token-inspiration">未割当スタッフへ自動補完</span>
+      <span class="token-chip token-inspiration">${calcNote}</span>
       <span class="token-chip token-passion">Nは職種制限なし</span>
     `;
     if (this.elements.nPoolCount) {
       this.elements.nPoolCount.textContent = String(remaining);
     }
+  }
+
+  renderActionCalcPanel() {
+    if (!this.elements.actionCalcPanel) {
+      return;
+    }
+    const active = this.isCalcNormalActionMode();
+    this.elements.actionCalcPanel.classList.toggle('hidden', !active);
+    if (!active) {
+      this.elements.actionCalcPanel.innerHTML = '';
+      return;
+    }
+
+    const usedStaff = new Set(Object.values(this.state.assignments).filter(Boolean));
+    const remainingStaff = NORMAL_STAFF_ORDER.filter((key) => !usedStaff.has(key));
+    const nTargets = remainingStaff.slice(0, this.nPool.length);
+    const nMissing = remainingStaff.slice(this.nPool.length);
+
+    this.elements.actionCalcPanel.innerHTML = `
+      <div class="calc-input-group">
+        <div class="calc-slot-row"><strong>計算機入力</strong><span>手札4枚の配置先と、未割当スタッフの Nカード番号を指定します。</span></div>
+        ${Array.from({ length: 4 }, (_, index) => {
+          const card = this.state.hand[index];
+          if (!card) {
+            return `
+              <div class="calc-slot-row">
+                <label>手札${index + 1}</label>
+                <input class="calc-card-input" type="text" value="未取得" disabled>
+              </div>
+            `;
+          }
+          const assigned = this.selectedAssignment(index);
+          return `
+            <div class="calc-slot-row">
+              <label for="calcActionHand${index}">手札${index + 1}</label>
+              <span class="calc-preview-card">No.${normalizeCardNo(card.cardNo) ?? '-'} ${card.cardName}</span>
+              <select id="calcActionHand${index}" data-calc-hand-index="${index}">
+                <option value="" ${!assigned ? 'selected' : ''}>未使用</option>
+                ${NORMAL_STAFF_ORDER.map((staffKey) => `
+                  <option value="${staffKey}" ${assigned === staffKey ? 'selected' : ''}>${this.getStaffLabel(staffKey)}</option>
+                `).join('')}
+              </select>
+            </div>
+          `;
+        }).join('')}
+        ${nTargets.length > 0 ? `
+          <div class="calc-slot-row"><strong>Nプール指定</strong><span>残り ${this.nPool.length} 枚からスタッフ別にカード番号を入力します。</span></div>
+          ${nTargets.map((staffKey) => `
+            <div class="calc-slot-row">
+              <label for="calcActionN${staffKey}">${this.getStaffLabel(staffKey)}</label>
+              <input
+                id="calcActionN${staffKey}"
+                class="calc-card-input"
+                data-calc-n-staff="${staffKey}"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                placeholder="例: 5"
+                autocomplete="off"
+                value="${this.getCalcActionNAssignment(staffKey)}"
+              >
+            </div>
+          `).join('')}
+        ` : ''}
+        ${nMissing.length > 0 ? `
+          <div class="calc-slot-row">
+            <label>Nプール切れ</label>
+            <span class="calc-preview-card">${nMissing.map((staffKey) => this.getStaffLabel(staffKey)).join(' / ')} は空欄のまま進みます。</span>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    this.elements.actionCalcPanel.querySelectorAll('[data-calc-hand-index]').forEach((select) => {
+      select.addEventListener('change', () => {
+        this.setAssignment(Number(select.dataset.calcHandIndex), select.value || '');
+      });
+    });
+    this.elements.actionCalcPanel.querySelectorAll('[data-calc-n-staff]').forEach((input) => {
+      input.addEventListener('input', () => {
+        this.setCalcActionNAssignment(input.dataset.calcNStaff, input.value);
+      });
+    });
   }
 
   renderMenu() {
@@ -1878,7 +2796,7 @@ export class SummerGameApp {
       this.elements.summerPhaseDescription.textContent = turn?.phaseKind === 'prep'
         ? '山札のトップ3枚を見て1枚を交換するか捨てます。'
         : turn?.phaseKind === 'summer'
-          ? '各スタッフの講習デッキから1枚ずつ使うか、休憩します。'
+          ? '各スタッフの講習デッキから1枚ずつ使うか、並行カードを追加して使うか、休憩します。'
           : '休憩したスタッフの SR / SSR を復活させます。';
     }
     if (this.elements.summerPrepCounter) {
@@ -1932,6 +2850,11 @@ export class SummerGameApp {
     }
 
     const selectedId = this.pendingSummerPrep.selectedCandidateId;
+    const selectedCandidate = selectedId
+      ? this.pendingSummerPrep.candidates.find((card) => card.instanceId === selectedId)
+      : null;
+    const calcMode = this.isCalcSummerPrepMode();
+    const eligibleTargets = this.findSummerPrepEligibleTargets(selectedCandidate);
     this.elements.summerCandidateArea.innerHTML = `
       <div class="meeting-summary-item">選択中: ${this.pendingSummerPrep.category}</div>
       <div class="summer-candidate-grid">
@@ -1948,10 +2871,69 @@ export class SummerGameApp {
           </button>
         `).join('')}
       </div>
-      <div class="meeting-summary-item">交換先を選んでから「交換せず捨てる」か、カードを交換してください。</div>
+      ${calcMode ? `
+        <div class="calc-input-group">
+          <div class="calc-slot-row"><strong>計算機入力</strong><span>トップ3枚からカード番号を1枚選び、交換先スタッフとカード位置を入力します。</span></div>
+          <div class="calc-slot-row">
+            <label for="summerPrepCalcCandidateInput">候補カード番号</label>
+            <input
+              id="summerPrepCalcCandidateInput"
+              class="calc-card-input"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="例: 6"
+              autocomplete="off"
+              value="${selectedCandidate ? escapeHtml(normalizeCardNo(selectedCandidate.cardNo) ?? '') : ''}"
+            >
+          </div>
+          <div class="calc-slot-row">
+            <label for="summerPrepCalcStaffSelect">交換先スタッフ</label>
+            <select id="summerPrepCalcStaffSelect">
+              <option value="">選択してください</option>
+              ${SUMMER_STAFF_ORDER.map((staffKey) => `
+                <option value="${staffKey}">${this.getStaffLabel(staffKey)}</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="calc-slot-row">
+            <label for="summerPrepCalcSlotInput">カード位置</label>
+            <input
+              id="summerPrepCalcSlotInput"
+              class="calc-card-input"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="例: 1"
+              autocomplete="off"
+            >
+          </div>
+          <div class="calc-slot-row">
+            <span class="calc-preview-card">${selectedCandidate ? `交換可能: ${eligibleTargets.length}枚` : '候補カード番号を入力すると交換可否を判定します。'}${selectedCandidate && eligibleTargets.length === 0 ? ' / この候補は除外のみ可能です。' : ''}</span>
+            <button id="summerPrepCalcSubmit" class="btn-primary" type="button" ${selectedCandidate && eligibleTargets.length === 0 ? 'disabled' : ''}>入力で交換</button>
+          </div>
+        </div>
+      ` : '<div class="meeting-summary-item">交換先を選んでから「交換せず捨てる」か、カードを交換してください。</div>'}
     `;
     if (this.elements.summerDiscardButton) {
       this.elements.summerDiscardButton.disabled = !selectedId;
+    }
+    if (calcMode) {
+      if (this.elements.summerDiscardButton) {
+        this.elements.summerDiscardButton.disabled = false;
+      }
+      const submit = this.elements.summerCandidateArea.querySelector('#summerPrepCalcSubmit');
+      const candidateInput = this.elements.summerCandidateArea.querySelector('#summerPrepCalcCandidateInput');
+      const slotInput = this.elements.summerCandidateArea.querySelector('#summerPrepCalcSlotInput');
+      submit?.addEventListener('click', () => this.submitCalcSummerPrepExchange());
+      [candidateInput, slotInput].forEach((input) => {
+        input?.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            this.submitCalcSummerPrepExchange();
+          }
+        });
+      });
     }
   }
 
@@ -1965,8 +2947,11 @@ export class SummerGameApp {
     }
 
     this.elements.summerActionGrid.innerHTML = SUMMER_STAFF_ORDER.map((staffKey) => {
-      const selectedId = this.state.summerActionSelections[staffKey];
-      const selectedCard = selectedId ? this.state.staffDecks[staffKey].find((card) => card.instanceId === selectedId) : null;
+      const calcValue = escapeHtml(this.getCalcSummerActionEntry(staffKey));
+      const calcMode = this.isCalcSummerActionMode();
+      const selectedCards = this.getSummerActionSelectionIds(staffKey)
+        .map((selectedId) => this.state.staffDecks[staffKey].find((card) => card.instanceId === selectedId))
+        .filter(Boolean);
       const deckCount = this.state.staffDecks[staffKey]?.length ?? 0;
       return `
         <article class="summer-action-column">
@@ -1974,10 +2959,45 @@ export class SummerGameApp {
             <strong>${this.getStaffLabel(staffKey)}</strong>
             <span class="summer-deck-count">${deckCount}枚</span>
           </div>
-          <div class="summer-action-note">${selectedCard ? `選択中: ${selectedCard.cardName}` : '休憩中'}</div>
+          <div class="summer-action-note">${selectedCards.length > 0 ? `選択中: ${selectedCards.map((card) => card.cardName).join(' / ')}` : '休憩中'}</div>
+          ${calcMode ? `
+            <div class="calc-input-group">
+              <div class="calc-slot-row">
+                <label for="calcSummerAction${staffKey}">使うカード番号</label>
+                <input
+                  id="calcSummerAction${staffKey}"
+                  class="calc-card-input"
+                  data-calc-summer-staff="${staffKey}"
+                  type="text"
+                  inputmode="text"
+                  placeholder="例: 6,8 / 休む"
+                  autocomplete="off"
+                  value="${calcValue}"
+                >
+              </div>
+              <div class="calc-slot-row">
+                <span class="calc-preview-card">番号はこのデッキ内のみ有効。2枚目以降は並行カードのみ。</span>
+                <button type="button" class="summer-rest-button ${this.getCalcSummerActionEntry(staffKey).trim() === '休む' ? 'active' : ''}" data-summer-rest="${staffKey}">休む</button>
+              </div>
+            </div>
+          ` : ''}
         </article>
       `;
     }).join('');
+
+    if (this.isCalcSummerActionMode()) {
+      this.elements.summerActionGrid.querySelectorAll('[data-calc-summer-staff]').forEach((input) => {
+        input.addEventListener('input', () => {
+          this.setCalcSummerActionEntry(input.dataset.calcSummerStaff, input.value);
+        });
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            this.resolveSummerActionPhase();
+          }
+        });
+      });
+    }
   }
 
   renderSummerDeckGrid() {
@@ -1996,7 +3016,7 @@ export class SummerGameApp {
 
     this.elements.summerDeckGrid.innerHTML = SUMMER_STAFF_ORDER.map((staffKey) => {
       const deck = this.state.staffDecks[staffKey] ?? [];
-      const selectionId = this.state.summerActionSelections[staffKey];
+      const selectionIds = this.getSummerActionSelectionIds(staffKey);
       return `
         <article class="summer-deck-column">
           <div class="summer-deck-column-head">
@@ -2008,7 +3028,7 @@ export class SummerGameApp {
               const flipped = this.isSummerCardFlipped(staffKey, card);
               if (mode === 'summer-action') {
                 return `
-                  <button type="button" class="summer-deck-card-button ${selectionId === card.instanceId ? 'selected' : ''} ${flipped ? 'flipped' : ''} ${flipped ? 'disabled' : ''}" data-summer-use data-summer-use-staff="${staffKey}" data-summer-use-id="${card.instanceId}" ${flipped ? 'disabled' : ''}>
+                  <button type="button" class="summer-deck-card-button ${selectionIds.includes(card.instanceId) ? 'selected' : ''} ${flipped ? 'flipped' : ''} ${flipped ? 'disabled' : ''}" data-summer-use data-summer-use-staff="${staffKey}" data-summer-use-id="${card.instanceId}" ${flipped ? 'disabled' : ''}>
                     <div class="summer-card-top">
                       <span class="summer-card-name">${card.cardName}</span>
                       <span class="card-rarity rarity-${card.rarity}">${card.rarity}</span>
@@ -2059,7 +3079,7 @@ export class SummerGameApp {
               </button>
             </div>
           ` : ''}
-          ${mode === 'summer-action' ? `<div class="summer-deck-actions"><button type="button" class="summer-rest-button ${this.state.summerActionSelections[staffKey] === null ? 'active' : ''}" data-summer-rest="${staffKey}">休む</button></div>` : ''}
+          ${mode === 'summer-action' ? `<div class="summer-deck-actions"><button type="button" class="summer-rest-button ${selectionIds.length === 0 ? 'active' : ''}" data-summer-rest="${staffKey}">休む</button></div>` : ''}
         </article>
       `;
     }).join('');
@@ -2210,6 +3230,53 @@ export class SummerGameApp {
       `<div class="meeting-summary-item">残り発想: ${inspiration}</div>`,
       `<div class="meeting-summary-item">選択山札: ${selected ? `${selected.poolType} / ${selected.category}` : '未選択'}</div>`,
       `<div class="meeting-summary-item">候補数: ${selected ? selected.candidates.length : 0}</div>`,
+      ...(this.isCalcSummerMeetingMode() ? [`
+        <div class="calc-input-group">
+          <div class="calc-slot-row"><strong>計算機入力</strong><span>山札、トップ3枚候補のカード番号、追加先スタッフを指定します。</span></div>
+          <div class="calc-slot-row">
+            <label for="summerMeetingInspirationCalcPoolSelect">山札</label>
+            <select id="summerMeetingInspirationCalcPoolSelect">
+              ${['地域', '全校'].map((poolType) => `
+                <option value="${poolType}" ${selected?.poolType === poolType ? 'selected' : ''}>${poolType}</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="calc-slot-row">
+            <label for="summerMeetingInspirationCalcCategorySelect">カテゴリ</label>
+            <select id="summerMeetingInspirationCalcCategorySelect">
+              ${TRAINING_CATEGORIES.map((category) => `
+                <option value="${category}" ${selected?.category === category ? 'selected' : ''}>${category}</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="calc-slot-row">
+            <label for="summerMeetingInspirationCalcCardInput">候補カード番号</label>
+            <input
+              id="summerMeetingInspirationCalcCardInput"
+              class="calc-card-input"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="例: 6"
+              autocomplete="off"
+              value="${selectedId ? escapeHtml(normalizeCardNo(selected?.candidates.find((card) => card.instanceId === selectedId)?.cardNo) ?? '') : ''}"
+            >
+          </div>
+          <div class="calc-slot-row">
+            <label for="summerMeetingInspirationCalcStaffSelect">追加先スタッフ</label>
+            <select id="summerMeetingInspirationCalcStaffSelect">
+              <option value="">選択してください</option>
+              ${SUMMER_STAFF_ORDER.map((staffKey) => `
+                <option value="${staffKey}">${this.getStaffLabel(staffKey)}</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="calc-slot-row">
+            <span class="calc-preview-card">候補番号は指定した山札のトップ3枚のみ有効です。</span>
+            <button id="summerMeetingInspirationCalcSubmit" class="btn-primary" type="button">入力で追加</button>
+          </div>
+        </div>
+      `] : []),
     ].join('');
 
     this.elements.summerMeetingInspirationChoices.innerHTML = ['地域', '全校'].flatMap((poolType) => (
@@ -2224,6 +3291,18 @@ export class SummerGameApp {
         `;
       })
     )).join('');
+
+    if (this.isCalcSummerMeetingMode()) {
+      const submit = this.elements.summerMeetingInspirationPanel.querySelector('#summerMeetingInspirationCalcSubmit');
+      const cardInput = this.elements.summerMeetingInspirationPanel.querySelector('#summerMeetingInspirationCalcCardInput');
+      submit?.addEventListener('click', () => this.submitCalcSummerMeetingInspiration());
+      cardInput?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          this.submitCalcSummerMeetingInspiration();
+        }
+      });
+    }
 
     if (!selected) {
       this.elements.summerMeetingInspirationCandidateArea.innerHTML = '<div class="meeting-summary-item">山札を1つ選んでください。</div>';
@@ -2276,6 +3355,24 @@ export class SummerGameApp {
       `<div class="meeting-summary-item">残り整理: ${organize}</div>`,
       `<div class="meeting-summary-item">削除候補: ${candidates.length}件</div>`,
       `<div class="meeting-summary-item">${lockedByInspiration ? '発想追加の候補選択中は整理を使えません。' : '任意のスタッフ別デッキから1枚を削除できます。'}</div>`,
+      ...(this.isCalcSummerMeetingMode() ? [`
+        <div class="calc-input-group">
+          <div class="calc-slot-row"><strong>計算機入力</strong><span>削除したいスタッフ別デッキ内カードの番号を指定します。</span></div>
+          <div class="calc-slot-row">
+            <label for="summerMeetingOrganizeCalcCardInput">対象カード番号</label>
+            <input
+              id="summerMeetingOrganizeCalcCardInput"
+              class="calc-card-input"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="例: 5"
+              autocomplete="off"
+            >
+            <button id="summerMeetingOrganizeCalcSubmit" class="btn-secondary" type="button">入力で削除</button>
+          </div>
+        </div>
+      `] : []),
     ].join('');
 
     this.elements.summerMeetingOrganizeTargets.innerHTML = candidates.length > 0
@@ -2318,6 +3415,17 @@ export class SummerGameApp {
       const disabled = !selected || organize < 1 || lockedByInspiration;
       this.elements.summerMeetingOrganizeConfirm.disabled = disabled;
       this.elements.summerMeetingOrganizeConfirm.textContent = '選択カードを削除';
+    }
+    if (this.isCalcSummerMeetingMode()) {
+      const submit = this.elements.summerMeetingOrganizePanel.querySelector('#summerMeetingOrganizeCalcSubmit');
+      const input = this.elements.summerMeetingOrganizePanel.querySelector('#summerMeetingOrganizeCalcCardInput');
+      submit?.addEventListener('click', () => this.submitCalcSummerMeetingOrganize());
+      input?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          this.submitCalcSummerMeetingOrganize();
+        }
+      });
     }
   }
 
@@ -2503,6 +3611,24 @@ export class SummerGameApp {
       `<div class="meeting-summary-item">残り情熱: ${passion}</div>`,
       `<div class="meeting-summary-item">復活可能: ${candidates.length}件</div>`,
       `<div class="meeting-summary-item">必要情熱合計: ${totalCost}</div>`,
+      ...(this.isCalcSummerMeetingMode() ? [`
+        <div class="calc-input-group">
+          <div class="calc-slot-row"><strong>計算機入力</strong><span>復活したい裏返し SR / SSR のカード番号を指定します。</span></div>
+          <div class="calc-slot-row">
+            <label for="summerMeetingRevivalCalcCardInput">対象カード番号</label>
+            <input
+              id="summerMeetingRevivalCalcCardInput"
+              class="calc-card-input"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="例: 41"
+              autocomplete="off"
+            >
+            <button id="summerMeetingRevivalCalcSubmit" class="btn-secondary" type="button">入力で復活</button>
+          </div>
+        </div>
+      `] : []),
     ].join('');
 
     this.elements.summerMeetingRevivalTargets.innerHTML = candidates.length > 0
@@ -2530,6 +3656,17 @@ export class SummerGameApp {
         ? `情熱${selected.cost}で復活`
         : '選択カードを復活';
     }
+    if (this.isCalcSummerMeetingMode()) {
+      const submit = this.elements.summerMeetingRevivalPanel.querySelector('#summerMeetingRevivalCalcSubmit');
+      const input = this.elements.summerMeetingRevivalPanel.querySelector('#summerMeetingRevivalCalcCardInput');
+      submit?.addEventListener('click', () => this.submitCalcSummerMeetingRevival());
+      input?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          this.submitCalcSummerMeetingRevival();
+        }
+      });
+    }
   }
 
   updateSummerActionConfirmState() {
@@ -2554,7 +3691,7 @@ export class SummerGameApp {
     } else if (turn.phaseKind === 'prep') {
       this.elements.phaseDescription.textContent = `${turn.season}の準備。${turn.poolType}プールから3枚見て交換するか捨てます。${prepText}。`;
     } else if (turn.phaseKind === 'summer') {
-      this.elements.phaseDescription.textContent = `${turn.season}の教室行動。4つの講習デッキから1枚ずつ使うか休憩します。${prepText}。`;
+      this.elements.phaseDescription.textContent = `${turn.season}の教室行動。4つの講習デッキから1枚ずつ使うか、並行カードを追加して使うか休憩します。${prepText}。`;
     } else if (turn.phaseKind === 'result') {
       this.elements.phaseDescription.textContent = '結果画面。累積した4指標からランクを表示します。';
     } else {
@@ -2566,30 +3703,21 @@ export class SummerGameApp {
     if (this.state.phase !== 'result' || !this.elements.resultSummary) {
       return;
     }
+    this.syncResultHighscore();
     if (this.state.difficulty === 'fresh') {
       this.renderFreshResult();
       return;
     }
-    const total = sumStats(this.state.stats);
-    this.elements.resultSummary.innerHTML = STAT_KEYS.map((item) => {
-      const { current } = this.currentRankFor(item.key);
-      return `
-        <li class="result-item">
-          <span class="result-label">${item.label}</span>
-          <span class="result-value">${this.state.stats[item.key] ?? 0}</span>
-          <span class="result-rank">${current.rank}</span>
-        </li>
-      `;
-    }).join('');
-    this.elements.resultRank.textContent = `合計 ${total}`;
-    this.elements.resultTurn.textContent = `${this.state.usedTurns.length}ターン完了`;
+    this.renderProResult();
   }
 
   updateActionConfirmState() {
     if (!this.elements.actionConfirm) {
       return;
     }
-    const active = this.state.phase === 'action' && this.state.hand.some((_, index) => this.state.assignments[index]);
+    const active = this.isCalcNormalActionMode()
+      ? this.state.phase === 'action'
+      : this.state.phase === 'action' && this.state.hand.some((_, index) => this.state.assignments[index]);
     this.elements.actionConfirm.disabled = !active;
   }
 

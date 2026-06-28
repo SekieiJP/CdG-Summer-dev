@@ -922,6 +922,10 @@ body {
     color: #6B7280;
 }
 
+.rank-F {
+    color: #6B7280;
+}
+
 .rank-D {
     color: #EF4444;
 }
@@ -953,6 +957,10 @@ body {
 .rank-Splus {
     color: #EC4899;
     text-shadow: 0 0 10px #EC4899;
+}
+
+.rank-SS {
+    color: #F97316;
 }
 
 .rank-name {

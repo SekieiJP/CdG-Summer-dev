@@ -89,6 +89,7 @@
         </div>
         <div id="staffGrid" class="staff-grid"></div>
         <div id="nPoolSummary" class="n-pool-summary"></div>
+        <div id="actionCalcPanel" class="calc-action-inputs hidden"></div>
         <div id="handGridAction" class="hand-grid"></div>
         <button id="actionConfirm" class="btn-primary" type="button">教室行動を確定</button>
       </section>
@@ -128,7 +129,7 @@
         <div id="summerActionPanel" class="summer-panel hidden">
           <div class="summer-panel-head">
             <h3>教室行動</h3>
-            <p>4スタッフの個人デッキから1枚ずつ使うか、休憩します。</p>
+            <p>4スタッフの個人デッキから1枚ずつ使うか、並行カードを追加して使うか、休憩します。</p>
           </div>
           <div id="summerActionGrid" class="summer-action-grid"></div>
           <button id="summerActionConfirm" class="btn-primary" type="button">教室行動を確定</button>
@@ -207,6 +208,15 @@
             <span class="difficulty-name">PRO</span>
             <span class="difficulty-desc">上級難易度</span>
           </button>
+        </div>
+        <div class="calc-mode-row">
+          <label class="calc-mode-label" for="calcModeToggle">
+            <span>計算機モード</span>
+            <span class="toggle-switch">
+              <input id="calcModeToggle" type="checkbox" aria-label="計算機モード">
+              <span class="toggle-slider" aria-hidden="true"></span>
+            </span>
+          </label>
         </div>
         <button id="startGame" class="btn-primary btn-large" type="button">ゲーム開始</button>
         <div class="summer-start-note">
